@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>Red Lotus · Preisrechner</title>
+<meta name="theme-color" content="#1c1b1a">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#1c1b1a;
+  --ink-2:#2a2726;
+  --ink-3:#3a3634;
+  --red:#8f1d33;
+  --red-deep:#6b1526;
+  --red-bright:#b02942;
+  --gold:#c9a35e;
+  --gold-soft:#e4cf9c;
+  --cream:#f6efe2;
+  --cream-dim:#e9ddc6;
+  --ok:#5c8362;
+  --warn:#c9793e;
+  --line:rgba(201,163,94,0.18);
+  --shadow:0 10px 30px rgba(0,0,0,0.35);
+}
+*{box-sizing:border-box;}
+body{
+  margin:0;background:var(--ink);color:var(--cream);
+  font-family:'Work Sans',sans-serif;-webkit-font-smoothing:antialiased;
+}
+.app{max-width:520px;margin:0 auto;padding:16px 14px 40px;}
+.wordmark{font-family:'Marcellus',serif;letter-spacing:0.04em;}
+
+header.top{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 16px;border-radius:16px;
+  background:linear-gradient(135deg, var(--ink-2), var(--ink-3));
+  border:1px solid var(--line);box-shadow:var(--shadow);
+  margin-bottom:16px;gap:10px;flex-wrap:wrap;
+}
+.brand{display:flex;align-items:center;gap:12px;}
+.brand-mark{
+  width:42px;height:42px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%, var(--red-bright), var(--red-deep) 70%);
+  border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;
+  font-family:'Marcellus',serif;color:var(--gold-soft);font-size:18px;flex-shrink:0;
+}
+.brand h1{font-size:18px;margin:0;font-weight:600;}
+.brand .sub{font-size:11px;color:var(--gold-soft);opacity:0.85;letter-spacing:0.08em;text-transform:uppercase;}
+a.link-chip{
+  color:var(--gold-soft);text-decoration:none;font-size:12px;
+  border:1px solid var(--line);padding:7px 12px;border-radius:9px;white-space:nowrap;
+}
+a.link-chip:hover{border-color:var(--gold);}
+
+.panel{
+  background:var(--ink-2);border:1px solid var(--line);border-radius:16px;
+  padding:18px;margin-top:14px;box-shadow:var(--shadow);
+}
+.panel h3{font-family:'Marcellus',serif;font-size:16px;margin:0 0 12px;font-weight:400;color:var(--gold-soft);}
+.panel .sub-title{font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--gold-soft);opacity:0.7;margin:14px 0 8px;}
+
+/* Summe-Anzeige */
+.sum-display{text-align:right;margin-bottom:10px;}
+.sum-display .label{font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--gold-soft);opacity:0.8;}
+.sum-display .amount{font-family:'Marcellus',serif;font-size:38px;color:var(--cream);line-height:1.1;}
+.sum-display .amount.zero{opacity:0.35;}
+
+/* Postenliste */
+.item-list{display:flex;flex-direction:column;gap:6px;margin:12px 0;max-height:180px;overflow-y:auto;}
+.item-row{
+  display:flex;justify-content:space-between;align-items:center;
+  background:var(--ink-3);border:1px solid var(--line);border-radius:10px;
+  padding:9px 12px;font-size:14px;
+}
+.item-row .price{font-weight:600;}
+.item-row button{
+  background:transparent;border:none;color:var(--cream);opacity:0.55;
+  font-size:16px;cursor:pointer;padding:2px 6px;line-height:1;
+}
+.item-row button:hover{opacity:1;color:var(--gold-soft);}
+.empty-state{font-size:12.5px;opacity:0.5;text-align:center;padding:10px 0;}
+
+/* Feste Preis-Buttons */
+.price-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.price-grid .price-btn-wrap{position:relative;}
+.price-grid button.price-btn{
+  width:100%;background:var(--ink-3);border:1px solid var(--line);color:var(--cream);
+  padding:14px 4px;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;
+  font-family:'Work Sans',sans-serif;transition:background .12s;
+}
+.price-grid button.price-btn:active{background:var(--red);border-color:var(--red-bright);color:#fff;}
+.price-grid .price-btn-del{
+  position:absolute;top:-7px;right:-7px;width:22px;height:22px;border-radius:50%;
+  background:var(--red);color:#fff;border:2px solid var(--ink-2);font-size:12px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;line-height:1;
+}
+.manage-row{display:flex;justify-content:flex-end;margin-bottom:10px;}
+.manage-row button{
+  background:transparent;border:1px solid var(--line);color:var(--gold-soft);
+  padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;font-family:'Work Sans',sans-serif;
+}
+.manage-row button:hover{border-color:var(--gold);}
+.add-price-row{display:flex;gap:8px;margin-top:10px;}
+.add-price-row input{
+  flex:1;background:var(--ink);border:1px solid var(--line);color:var(--cream);
+  padding:10px 12px;border-radius:9px;font-size:14px;font-family:'Work Sans',sans-serif;
+}
+.add-price-row input:focus{outline:none;border-color:var(--gold);}
+.add-price-row button{
+  background:var(--gold);color:var(--ink);border:none;padding:0 16px;border-radius:9px;
+  font-weight:600;cursor:pointer;font-family:'Work Sans',sans-serif;
+}
+
+/* Zifferntastatur (fuer individuelle Betraege) */
+.keypad-display{
+  background:var(--ink);border:1px solid var(--line);border-radius:12px;
+  padding:12px 16px;text-align:right;font-family:'Marcellus',serif;
+  font-size:26px;margin-bottom:10px;color:var(--cream);letter-spacing:0.02em;
+  overflow-x:auto;white-space:nowrap;
+}
+.keypad-display .euro{opacity:0.5;font-size:18px;margin-right:4px;}
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.keypad button{
+  background:var(--ink-3);border:1px solid var(--line);color:var(--cream);
+  padding:14px 0;border-radius:10px;font-size:17px;font-weight:600;cursor:pointer;
+  font-family:'Work Sans',sans-serif;transition:background .12s;
+}
+.keypad button:active{background:var(--ink);}
+.keypad button.clear{color:#e79aa7;border-color:var(--red);}
+.keypad button.clear:active{background:var(--red);color:#fff;}
+.keypad button.add{background:var(--gold);color:var(--ink);border-color:var(--gold);grid-row:span 2;font-size:14px;}
+.keypad button.add:active{background:var(--gold-soft);}
+
+/* Bezahlt / Wechselgeld */
+.cash-shortcuts{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+.cash-shortcuts button{
+  flex:1;min-width:64px;background:var(--ink-3);border:1px solid var(--line);color:var(--cream);
+  padding:10px 0;border-radius:9px;font-size:13.5px;font-weight:600;cursor:pointer;
+}
+.cash-shortcuts button:active{border-color:var(--gold);}
+.change-display{text-align:center;padding:16px 0 4px;}
+.change-display .label{font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--gold-soft);opacity:0.8;}
+.change-display .amount{font-family:'Marcellus',serif;font-size:34px;margin-top:2px;}
+.change-display .amount.ok{color:var(--gold-soft);}
+.change-display .amount.warn{color:#e79aa7;}
+.change-display .hint{font-size:12px;opacity:0.6;margin-top:4px;}
+
+.btn{
+  background:var(--red);color:#fff;border:none;padding:11px 16px;border-radius:9px;
+  cursor:pointer;font-size:13.5px;font-weight:600;letter-spacing:0.01em;width:100%;
+  font-family:'Work Sans',sans-serif;margin-top:12px;
+}
+.btn:hover{background:var(--red-bright);}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--cream);}
+.btn.ghost:hover{border-color:var(--gold);}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+
+<script>
+/* ============================= FESTE PREISE =============================
+   Startbelegung beim allerersten Öffnen. Danach verwaltet sich die Liste
+   selbst über den "Preise verwalten"-Button in der App (im Browser auf
+   diesem Gerät gespeichert). */
+const DEFAULT_PRICES = [7, 7.50, 8.50, 9.40, 9.90, 10.90, 9.50, 11.90, 12.90];
+const PRICES_STORAGE_KEY = 'redlotus_preisrechner_preise';
+
+function loadPrices(){
+  try{
+    const raw = localStorage.getItem(PRICES_STORAGE_KEY);
+    if(raw){
+      const arr = JSON.parse(raw);
+      if(Array.isArray(arr) && arr.length) return arr;
+    }
+  }catch(e){ console.warn('Preise konnten nicht geladen werden, nutze Standardliste:', e); }
+  return DEFAULT_PRICES.slice();
+}
+function savePrices(prices){
+  try{ localStorage.setItem(PRICES_STORAGE_KEY, JSON.stringify(prices)); }
+  catch(e){ console.warn('Preise konnten nicht gespeichert werden:', e); }
+}
+
+/* ============================= STATE ============================= */
+let state = {
+  prices: loadPrices(), // feste Preis-Buttons, im Browser auf diesem Gerät gespeichert
+  editMode: false,      // "Preise verwalten"-Modus (Buttons löschen / neue hinzufügen)
+  newPriceEntry: '',     // Eingabe fürs Hinzufügen eines neuen Preis-Buttons
+  items: [],        // [{id, price}]
+  entry: '',         // individuelle Betrags-Eingabe (falls Preis nicht in der Liste ist)
+  paidEntry: '',      // aktuell eingetippter "Bezahlt mit"-Betrag
+  paid: null          // bestätigter "bezahlt mit"-Betrag (per Schnellwahl-Button)
+};
+
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function fmtEUR(n){ return (n||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €'; }
+function parseEntry(str){
+  if(!str) return 0;
+  return parseFloat(str.replace(',','.')) || 0;
+}
+function total(){
+  return state.items.reduce((s,it)=>s+it.price, 0);
+}
+function addItem(price){
+  if(price>0) state.items.push({id:uid(), price});
+}
+
+/* ============================= RENDER ============================= */
+function render(){
+  const app = document.getElementById('app');
+  const t = total();
+  const paidAmount = state.paid !== null ? state.paid : parseEntry(state.paidEntry);
+  const change = paidAmount - t;
+
+  app.innerHTML = `
+  <header class="top">
+    <div class="brand">
+      <div class="brand-mark">RL</div>
+      <div>
+        <h1 class="wordmark">Red Lotus</h1>
+        <div class="sub">Preisrechner</div>
+      </div>
+    </div>
+    <a href="index.html" class="link-chip">📅 Kalender</a>
+  </header>
+
+  <div class="panel">
+    <h3>Bestellung</h3>
+    <div class="sum-display">
+      <div class="label">Gesamtsumme</div>
+      <div class="amount ${t===0?'zero':''}">${fmtEUR(t)}</div>
+    </div>
+    <div class="item-list">
+      ${state.items.length ? state.items.map((it,idx)=>`
+        <div class="item-row">
+          <span>Posten ${idx+1}</span>
+          <span style="display:flex;align-items:center;gap:8px;">
+            <span class="price">${fmtEUR(it.price)}</span>
+            <button type="button" data-del-item="${it.id}" title="Entfernen">✕</button>
+          </span>
+        </div>`).join('') : '<div class="empty-state">Noch keine Posten hinzugefügt.</div>'}
+    </div>
+
+    <div class="manage-row">
+      <button type="button" id="toggleEditBtn">${state.editMode ? '✓ Fertig' : '✎ Preise verwalten'}</button>
+    </div>
+    <div class="price-grid">
+      ${state.prices.map((p,idx)=>`
+        <div class="price-btn-wrap">
+          <button type="button" class="price-btn" data-static-price="${p}" ${state.editMode?'disabled':''}>${fmtEUR(p)}</button>
+          ${state.editMode ? `<button type="button" class="price-btn-del" data-del-price="${idx}" title="Preis entfernen">✕</button>` : ''}
+        </div>`).join('')}
+    </div>
+    ${state.editMode ? `
+    <div class="add-price-row">
+      <input type="text" inputmode="decimal" id="newPriceInput" placeholder="Neuer Preis, z. B. 6,50" value="${state.newPriceEntry}">
+      <button type="button" id="addPriceBtn">+ Hinzufügen</button>
+    </div>` : ''}
+
+    <div class="sub-title">Individueller Betrag</div>
+    <div class="keypad-display"><span class="euro">€</span>${state.entry || '0'}</div>
+    <div class="keypad">
+      ${['7','8','9','4','5','6','1','2','3'].map(n=>`<button type="button" data-key="${n}">${n}</button>`).join('')}
+      <button type="button" data-key="0">0</button>
+      <button type="button" data-key=",">,</button>
+      <button type="button" class="clear" data-key="clear">⌫</button>
+      <button type="button" class="add" data-key="add">Hinzufügen</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>Bezahlt mit</h3>
+    <div class="keypad-display"><span class="euro">€</span>${state.paidEntry || (state.paid!==null ? state.paid.toLocaleString('de-DE',{minimumFractionDigits:2}) : '0')}</div>
+    <div class="cash-shortcuts">
+      ${[5,10,20,50,100].map(v=>`<button type="button" data-paid-quick="${v}">${v} €</button>`).join('')}
+    </div>
+    <div class="keypad">
+      ${['7','8','9','4','5','6','1','2','3'].map(n=>`<button type="button" data-paid-key="${n}">${n}</button>`).join('')}
+      <button type="button" data-paid-key="0">0</button>
+      <button type="button" data-paid-key=",">,</button>
+      <button type="button" class="clear" data-paid-key="clear">⌫</button>
+    </div>
+    ${(state.paidEntry || state.paid!==null) ? `
+    <div class="change-display">
+      <div class="label">${change<0 ? 'Fehlbetrag' : 'Wechselgeld'}</div>
+      <div class="amount ${change<0?'warn':'ok'}">${fmtEUR(Math.abs(change))}</div>
+      ${change<0 ? '<div class="hint">Bezahlter Betrag reicht noch nicht.</div>' : ''}
+    </div>` : ''}
+  </div>
+
+  <button type="button" class="btn ghost" id="resetBtn">Neue Bestellung</button>
+  `;
+  attachHandlers();
+}
+
+/* ============================= HANDLERS ============================= */
+function attachHandlers(){
+  document.querySelectorAll('[data-static-price]').forEach(btn=>btn.onclick=()=>{
+    if(state.editMode) return;
+    addItem(parseFloat(btn.dataset.staticPrice));
+    render();
+  });
+
+  const toggleEditBtn = document.getElementById('toggleEditBtn');
+  if(toggleEditBtn) toggleEditBtn.onclick = ()=>{
+    state.editMode = !state.editMode;
+    state.newPriceEntry = '';
+    render();
+  };
+
+  document.querySelectorAll('[data-del-price]').forEach(btn=>btn.onclick=()=>{
+    const idx = parseInt(btn.dataset.delPrice, 10);
+    state.prices.splice(idx, 1);
+    savePrices(state.prices);
+    render();
+  });
+
+  const newPriceInput = document.getElementById('newPriceInput');
+  if(newPriceInput){
+    newPriceInput.oninput = ()=>{ state.newPriceEntry = newPriceInput.value; };
+    newPriceInput.onkeydown = (ev)=>{ if(ev.key==='Enter') addPriceBtn.click(); };
+  }
+  const addPriceBtn = document.getElementById('addPriceBtn');
+  if(addPriceBtn) addPriceBtn.onclick = ()=>{
+    const val = parseEntry(state.newPriceEntry);
+    if(val>0){
+      state.prices.push(val);
+      savePrices(state.prices);
+      state.newPriceEntry = '';
+      render();
+    }
+  };
+
+  document.querySelectorAll('[data-key]').forEach(btn=>btn.onclick=()=>{
+    const k = btn.dataset.key;
+    if(k==='clear'){ state.entry = state.entry.slice(0,-1); }
+    else if(k==='add'){
+      addItem(parseEntry(state.entry));
+      state.entry='';
+    } else if(k===','){
+      if(!state.entry.includes(',')) state.entry += (state.entry?',':'0,');
+    } else {
+      if(state.entry==='0') state.entry = k;
+      else state.entry += k;
+    }
+    render();
+  });
+
+  document.querySelectorAll('[data-paid-key]').forEach(btn=>btn.onclick=()=>{
+    const k = btn.dataset.paidKey;
+    state.paid = null;
+    if(k==='clear'){ state.paidEntry = state.paidEntry.slice(0,-1); }
+    else if(k===','){
+      if(!state.paidEntry.includes(',')) state.paidEntry += (state.paidEntry?',':'0,');
+    } else {
+      if(state.paidEntry==='0') state.paidEntry = k;
+      else state.paidEntry += k;
+    }
+    render();
+  });
+
+  document.querySelectorAll('[data-paid-quick]').forEach(btn=>btn.onclick=()=>{
+    state.paid = parseFloat(btn.dataset.paidQuick);
+    state.paidEntry = '';
+    render();
+  });
+
+  document.querySelectorAll('[data-del-item]').forEach(btn=>btn.onclick=()=>{
+    state.items = state.items.filter(it=>it.id!==btn.dataset.delItem);
+    render();
+  });
+
+  const resetBtn = document.getElementById('resetBtn');
+  if(resetBtn) resetBtn.onclick = ()=>{
+    // Nur die aktuelle Bestellung zurücksetzen — Preis-Buttons bleiben erhalten.
+    state.items = [];
+    state.entry = '';
+    state.paidEntry = '';
+    state.paid = null;
+    render();
+  };
+}
+
+render();
+</script>
+</body>
+</html>
