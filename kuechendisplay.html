@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>Red Lotus · Küchenbildschirm</title>
+<meta name="theme-color" content="#1c1b1a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Küche">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Work+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#1c1b1a; --ink-2:#2a2726; --ink-3:#3a3634;
+  --red:#8f1d33; --red-deep:#6b1526; --red-bright:#b02942;
+  --gold:#c9a35e; --gold-soft:#e4cf9c; --cream:#f6efe2; --cream-dim:#e9ddc6;
+  --ok:#5c8362; --warn:#c9793e;
+  --line:rgba(201,163,94,0.18); --shadow:0 10px 30px rgba(0,0,0,0.35);
+}
+*{box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  margin:0;background:var(--ink);color:var(--cream);
+  font-family:'Work Sans',sans-serif;-webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+.wordmark{font-family:'Marcellus',serif;letter-spacing:0.04em;}
+header.top{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 22px;background:linear-gradient(135deg, var(--ink-2), var(--ink-3));
+  border-bottom:1px solid var(--line);box-shadow:var(--shadow);
+}
+.brand{display:flex;align-items:center;gap:14px;}
+.brand-mark{
+  width:44px;height:44px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%, var(--red-bright), var(--red-deep) 70%);
+  border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;
+  font-family:'Marcellus',serif;color:var(--gold-soft);font-size:19px;flex-shrink:0;
+}
+.brand h1{font-size:20px;margin:0;font-weight:600;}
+.brand .sub{font-size:12px;color:var(--gold-soft);opacity:0.85;letter-spacing:0.08em;text-transform:uppercase;}
+.status-dot{width:10px;height:10px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);}
+.status-dot.off{background:#666;box-shadow:none;}
+
+.board{
+  display:grid;grid-template-columns:repeat(auto-fill, minmax(300px, 1fr));
+  gap:18px;padding:22px;
+}
+.empty-board{
+  grid-column:1/-1;text-align:center;padding:80px 20px;opacity:0.4;font-size:20px;
+  font-family:'Marcellus',serif;
+}
+.order-card{
+  background:var(--ink-2);border:1px solid var(--line);border-radius:18px;
+  padding:18px 20px 20px;box-shadow:var(--shadow);
+  display:flex;flex-direction:column;gap:10px;
+  animation:pop .25s ease-out;
+}
+.order-card.vorbestellung{border-color:var(--gold);box-shadow:0 0 0 2px rgba(201,163,94,0.25), var(--shadow);}
+@keyframes pop{from{transform:scale(0.94);opacity:0;}to{transform:scale(1);opacity:1;}}
+.order-head{display:flex;align-items:baseline;justify-content:space-between;}
+.order-number{font-family:'Marcellus',serif;font-size:44px;color:var(--gold-soft);line-height:1;}
+.order-time{font-size:12.5px;opacity:0.6;}
+.vorbestell-badge{
+  display:inline-block;background:rgba(201,163,94,0.18);border:1px solid var(--gold);
+  color:var(--gold-soft);font-size:12.5px;font-weight:700;padding:4px 10px;border-radius:20px;
+  margin-bottom:2px;
+}
+.order-items{display:flex;flex-direction:column;gap:4px;margin:4px 0;}
+.order-item{font-size:16px;display:flex;justify-content:space-between;gap:10px;}
+.order-item .qty{opacity:0.5;font-size:13px;}
+.order-box{font-size:12.5px;opacity:0.75;border-top:1px dashed var(--line);padding-top:8px;margin-top:2px;}
+.order-total{font-size:14px;font-weight:700;color:var(--gold-soft);text-align:right;}
+.ready-btn{
+  margin-top:6px;background:var(--red);color:#fff;border:none;padding:14px;border-radius:12px;
+  font-size:16px;font-weight:700;cursor:pointer;font-family:'Work Sans',sans-serif;
+  letter-spacing:0.02em;
+}
+.ready-btn:active{background:var(--red-bright);}
+.ready-btn:disabled{opacity:0.5;}
+.done-btn{
+  margin-top:6px;background:var(--ok);color:#fff;border:none;padding:14px;border-radius:12px;
+  font-size:16px;font-weight:700;cursor:pointer;font-family:'Work Sans',sans-serif;
+  letter-spacing:0.02em;
+}
+.done-btn:active{background:#4a6c50;}
+.done-btn:disabled{opacity:0.5;}
+.order-card.fertig{border-color:var(--ok);}
+.order-card.fertig .order-number{color:var(--gold-soft);opacity:0.85;}
+.section-title{
+  grid-column:1/-1;font-family:'Marcellus',serif;font-size:16px;color:var(--gold-soft);
+  opacity:0.75;letter-spacing:0.04em;text-transform:uppercase;font-size:13px;
+  margin:6px 0 -6px;padding-left:2px;
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <div class="brand-mark">RL</div>
+    <div>
+      <h1 class="wordmark">Red Lotus</h1>
+      <div class="sub">Küchenbildschirm</div>
+    </div>
+  </div>
+  <span class="status-dot off" id="statusDot" title="Verbindung"></span>
+</header>
+<div class="board" id="board">
+  <div class="empty-board">Warte auf Bestellungen …</div>
+</div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js';
+import {
+  getFirestore, collection, query, where, onSnapshot, doc, updateDoc
+} from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA0y6NWpF3N7241mA72Cj-gU_pvbqpNdD4",
+  authDomain: "red-lotus-eventkalender.firebaseapp.com",
+  projectId: "red-lotus-eventkalender",
+  storageBucket: "red-lotus-eventkalender.firebasestorage.app",
+  messagingSenderId: "864967561482",
+  appId: "1:864967561482:web:98ee51f304748e511f2af3"
+};
+const fbApp = initializeApp(firebaseConfig);
+const db = getFirestore(fbApp, "default");
+
+let knownIds = new Set();
+let firstLoad = true;
+
+function escapeHtml(str){
+  return String(str==null?'':str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function fmtEUR(n){ return (n||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €'; }
+function fmtTime(iso){
+  if(!iso) return '';
+  try{ return new Date(iso).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}); }
+  catch(e){ return ''; }
+}
+
+// Kurzer Signalton bei neuer Bestellung — per Web Audio API erzeugt,
+// keine externe Audiodatei nötig.
+let audioCtx = null;
+function playBeep(){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = 'sine';
+    o.frequency.value = 880;
+    g.gain.value = 0.001;
+    o.connect(g); g.connect(audioCtx.destination);
+    const now = audioCtx.currentTime;
+    g.gain.exponentialRampToValueAtTime(0.25, now + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+    o.start(now);
+    o.stop(now + 0.4);
+    // Zweiter, höherer Ton kurz danach für einen deutlichen "Ding-Dong".
+    const o2 = audioCtx.createOscillator();
+    const g2 = audioCtx.createGain();
+    o2.type = 'sine';
+    o2.frequency.value = 1320;
+    g2.gain.value = 0.001;
+    o2.connect(g2); g2.connect(audioCtx.destination);
+    g2.gain.exponentialRampToValueAtTime(0.22, now + 0.22);
+    g2.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+    o2.start(now + 0.2);
+    o2.stop(now + 0.6);
+  }catch(e){ console.warn('Signalton konnte nicht abgespielt werden:', e); }
+}
+// Browser verlangen eine erste Nutzer-Interaktion, bevor Ton erlaubt ist —
+// beim ersten Tippen auf den Bildschirm den AudioContext "freischalten".
+document.body.addEventListener('click', ()=>{
+  if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if(audioCtx.state === 'suspended') audioCtx.resume();
+}, { once:true });
+
+function orderCardHtml(o, mode){
+  // mode: 'offen' -> roter "Fertig"-Button, 'fertig' -> grüner "Abgeschlossen"-Button
+  const btnHtml = mode === 'offen'
+    ? `<button type="button" class="ready-btn" data-ready="${o.id}">✓ Fertig</button>`
+    : `<button type="button" class="done-btn" data-done="${o.id}">✓ Abgeschlossen</button>`;
+  return `
+    <div class="order-card ${o.isVorbestellung ? 'vorbestellung' : ''} ${mode==='fertig' ? 'fertig' : ''}">
+      ${o.isVorbestellung ? `<div class="vorbestell-badge">🕒 Vorbestellung ${escapeHtml(o.pickupTime||'')}</div>` : ''}
+      <div class="order-head">
+        <div class="order-number">#${o.number}</div>
+        <div class="order-time">${fmtTime(o.createdAt)}</div>
+      </div>
+      <div class="order-items">
+        ${(o.items||[]).map(it => `<div class="order-item"><span>${escapeHtml(it.label||'Position')}</span><span>${fmtEUR(it.price)}</span></div>`).join('')}
+      </div>
+      ${o.box ? `<div class="order-box">${o.box==='eigene' ? '🥡 Eigene Box' : '📦 Unsere Box'}</div>` : ''}
+      <div class="order-total">${fmtEUR(o.total)}</div>
+      ${btnHtml}
+    </div>`;
+}
+
+function render(orders){
+  const board = document.getElementById('board');
+  const offen = orders.filter(o => o.status === 'offen').sort((a,b)=> (a.number||0) - (b.number||0));
+  const fertig = orders.filter(o => o.status === 'fertig').sort((a,b)=> (a.number||0) - (b.number||0));
+
+  if(!offen.length && !fertig.length){
+    board.innerHTML = '<div class="empty-board">Warte auf Bestellungen …</div>';
+    return;
+  }
+
+  let html = '';
+  if(offen.length){
+    html += '<div class="section-title">Offen</div>' + offen.map(o => orderCardHtml(o, 'offen')).join('');
+  }
+  if(fertig.length){
+    html += '<div class="section-title">Fertig — wartet auf Abholung</div>' + fertig.map(o => orderCardHtml(o, 'fertig')).join('');
+  }
+  board.innerHTML = html;
+
+  board.querySelectorAll('[data-ready]').forEach(btn=>{
+    btn.onclick = async ()=>{
+      btn.disabled = true;
+      btn.textContent = '…';
+      try{
+        await updateDoc(doc(db, 'orders', btn.dataset.ready), {
+          status: 'fertig',
+          readyAt: new Date().toISOString()
+        });
+      }catch(e){
+        console.error('Konnte Bestellung nicht als fertig markieren:', e);
+        btn.disabled = false;
+        btn.textContent = '✓ Fertig';
+      }
+    };
+  });
+
+  board.querySelectorAll('[data-done]').forEach(btn=>{
+    btn.onclick = async ()=>{
+      btn.disabled = true;
+      btn.textContent = '…';
+      try{
+        await updateDoc(doc(db, 'orders', btn.dataset.done), {
+          status: 'abgeholt'
+        });
+      }catch(e){
+        console.error('Konnte Bestellung nicht als abgeschlossen markieren:', e);
+        btn.disabled = false;
+        btn.textContent = '✓ Abgeschlossen';
+      }
+    };
+  });
+}
+
+const q = query(collection(db, 'orders'), where('status', 'in', ['offen', 'fertig']));
+onSnapshot(q, (snap) => {
+  document.getElementById('statusDot').classList.remove('off');
+  const orders = [];
+  const currentIds = new Set();
+  snap.forEach(d => {
+    const data = d.data();
+    orders.push({ id: d.id, ...data });
+    currentIds.add(d.id);
+  });
+
+  if(!firstLoad){
+    let hasNew = false;
+    currentIds.forEach(id => { if(!knownIds.has(id)) hasNew = true; });
+    if(hasNew) playBeep();
+  }
+  knownIds = currentIds;
+  firstLoad = false;
+
+  render(orders);
+}, (err) => {
+  console.error('Küchenbildschirm: Verbindung zu Firestore fehlgeschlagen:', err);
+  document.getElementById('statusDot').classList.add('off');
+});
+
+// Bildschirm wach halten, solange die Seite offen ist (falls vom Browser unterstützt).
+if('wakeLock' in navigator){
+  const requestWakeLock = async () => {
+    try{ await navigator.wakeLock.request('screen'); }
+    catch(e){ console.warn('Wake Lock nicht verfügbar:', e); }
+  };
+  requestWakeLock();
+  document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState === 'visible') requestWakeLock();
+  });
+}
+</script>
+</body>
+</html>

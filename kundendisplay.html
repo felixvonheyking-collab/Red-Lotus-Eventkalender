@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>Red Lotus · Ihre Bestellung</title>
+<meta name="theme-color" content="#1c1b1a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bestellungen">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Work+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#1c1b1a; --ink-2:#2a2726; --ink-3:#3a3634;
+  --red:#8f1d33; --red-deep:#6b1526; --red-bright:#b02942;
+  --gold:#c9a35e; --gold-soft:#e4cf9c; --cream:#f6efe2;
+  --line:rgba(201,163,94,0.18);
+}
+*{box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  margin:0;background:var(--ink);color:var(--cream);
+  font-family:'Work Sans',sans-serif;-webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;min-height:100vh;
+}
+.wordmark{font-family:'Marcellus',serif;letter-spacing:0.04em;}
+header.top{
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  padding:26px 20px 20px;background:linear-gradient(135deg, var(--ink-2), var(--ink-3));
+  border-bottom:1px solid var(--line);
+}
+.brand-mark{
+  width:56px;height:56px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%, var(--red-bright), var(--red-deep) 70%);
+  border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;
+  font-family:'Marcellus',serif;color:var(--gold-soft);font-size:24px;margin-bottom:6px;
+}
+header.top h1{font-size:24px;margin:0;font-weight:600;}
+header.top .sub{font-size:14px;color:var(--gold-soft);opacity:0.9;text-align:center;max-width:480px;}
+
+main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px 20px;}
+.section-label{
+  font-size:14px;text-transform:uppercase;letter-spacing:0.12em;color:var(--gold-soft);
+  opacity:0.75;margin-bottom:18px;text-align:center;
+}
+.numbers{
+  display:flex;flex-wrap:wrap;gap:20px;justify-content:center;max-width:900px;
+}
+.number-chip{
+  background:var(--ink-2);border:2px solid var(--gold);border-radius:24px;
+  padding:22px 34px;font-family:'Marcellus',serif;font-size:56px;color:var(--gold-soft);
+  box-shadow:0 10px 30px rgba(0,0,0,0.35);
+  animation:pop .3s ease-out;
+}
+@keyframes pop{from{transform:scale(0.85);opacity:0;}to{transform:scale(1);opacity:1;}}
+.empty-state{font-size:20px;opacity:0.4;font-family:'Marcellus',serif;text-align:center;}
+footer{
+  text-align:center;padding:16px;font-size:11.5px;opacity:0.4;
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand-mark">RL</div>
+  <h1 class="wordmark">Red Lotus</h1>
+  <div class="sub">Wenn Ihre Nummer hier erscheint, ist Ihre Bestellung abholbereit.</div>
+</header>
+<main>
+  <div class="section-label">Abholbereit</div>
+  <div class="numbers" id="numbers">
+    <div class="empty-state">Aktuell keine Bestellung abholbereit.</div>
+  </div>
+</main>
+<footer>Red Lotus Asian Food</footer>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js';
+import {
+  getFirestore, collection, query, where, onSnapshot
+} from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA0y6NWpF3N7241mA72Cj-gU_pvbqpNdD4",
+  authDomain: "red-lotus-eventkalender.firebaseapp.com",
+  projectId: "red-lotus-eventkalender",
+  storageBucket: "red-lotus-eventkalender.firebasestorage.app",
+  messagingSenderId: "864967561482",
+  appId: "1:864967561482:web:98ee51f304748e511f2af3"
+};
+const fbApp = initializeApp(firebaseConfig);
+const db = getFirestore(fbApp, "default");
+
+const SICHTBAR_MINUTEN = 30; // wie lange eine fertige Bestellung hier stehen bleibt
+
+function render(orders){
+  const el = document.getElementById('numbers');
+  const cutoff = Date.now() - SICHTBAR_MINUTEN * 60 * 1000;
+  const visible = orders
+    .filter(o => {
+      const t = o.readyAt ? new Date(o.readyAt).getTime() : 0;
+      return t >= cutoff;
+    })
+    .sort((a,b) => (a.number||0) - (b.number||0));
+
+  if(!visible.length){
+    el.innerHTML = '<div class="empty-state">Aktuell keine Bestellung abholbereit.</div>';
+    return;
+  }
+  el.innerHTML = visible.map(o => `<div class="number-chip">${o.number}</div>`).join('');
+}
+
+const q = query(collection(db, 'orders'), where('status', '==', 'fertig'));
+let lastOrders = [];
+onSnapshot(q, (snap) => {
+  lastOrders = [];
+  snap.forEach(d => lastOrders.push(d.data()));
+  render(lastOrders);
+}, (err) => {
+  console.error('Kundenanzeige: Verbindung zu Firestore fehlgeschlagen:', err);
+});
+
+// Regelmäßig mit denselben Daten neu zeichnen, damit Nummern nach Ablauf
+// der Anzeigezeit automatisch verschwinden, auch ohne neue Firestore-Änderung.
+setInterval(() => { render(lastOrders); }, 60000);
+
+if('wakeLock' in navigator){
+  const requestWakeLock = async () => {
+    try{ await navigator.wakeLock.request('screen'); }
+    catch(e){ console.warn('Wake Lock nicht verfügbar:', e); }
+  };
+  requestWakeLock();
+  document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState === 'visible') requestWakeLock();
+  });
+}
+</script>
+</body>
+</html>
