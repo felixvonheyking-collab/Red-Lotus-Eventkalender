@@ -407,7 +407,30 @@ const DISH_GROUPS = [
       { label: 'Fleisch/Huhn', price: 10.90, vegan: false },
       { label: 'Tofu', price: 9.40, vegan: true }
     ]
+  },
+  {
+    id: 'salat', name: 'Salat',
+    kleinPrices: GENERIC_KLEIN, // Klein: 8,50 (Fleisch) / 7,00 (Vegan)
+    variants: [
+      { label: 'Fleisch/Huhn', price: 10.90, vegan: false },
+      { label: 'Vegan', price: 9.40, vegan: true }
+    ]
+  },
+  {
+    id: 'suppe', name: 'Suppe',
+    kleinPrices: { protein: 7.50, vegan: 7.50 }, // nur eine Größe unterschieden, kein Fleisch/Vegan-Split
+    variants: [
+      { label: 'Normal', price: 9.50, vegan: false }
+    ]
   }
+];
+
+/* ============================= SPECIALS =============================
+   Feste Einzelposten außerhalb der Tagesauswahl (immer verfügbar, zählen
+   nicht zu den 6 Haupt-Gerichten) — z. B. Getränke/Desserts. */
+const SPECIALS = [
+  { id: 'thaitea', label: 'Thai Tea', price: 4.00 },
+  { id: 'mangosticky', label: 'Mango Sticky Rice', price: 6.90 }
 ];
 
 /* ============================= TAGESAUSWAHL (Bausteine) =============================
@@ -552,6 +575,9 @@ function renderDishAdmin(){
     </div>
   `;
 }
+function renderSpecials(){
+  return `<div class="dish-grid">${SPECIALS.map(s=>`<button type="button" class="dish-btn" data-add-special="${s.id}">${escapeHtmlPR(s.label)}<br><b>${fmtEUR(s.price)}</b></button>`).join('')}</div>`;
+}
 function renderSonstigePreise(){
   return `
     <div class="manage-row">
@@ -633,10 +659,11 @@ function render(){
 
     <div class="order-mode-tabs">
       <button type="button" data-order-mode="gerichte" class="${state.orderMode==='gerichte'?'active':''}">🍜 Gerichte</button>
+      <button type="button" data-order-mode="specials" class="${state.orderMode==='specials'?'active':''}">🍧 Specials</button>
       <button type="button" data-order-mode="sonstige" class="${state.orderMode==='sonstige'?'active':''}">💰 Sonstige Preise</button>
     </div>
 
-    ${state.orderMode==='gerichte' ? renderDishPicker() : renderSonstigePreise()}
+    ${state.orderMode==='gerichte' ? renderDishPicker() : state.orderMode==='specials' ? renderSpecials() : renderSonstigePreise()}
     <div class="hint" style="margin-top:10px;">Box pro Posten in der Liste antippen für „eigene Box" — oder oben „Alles eigene Box" für die ganze Bestellung.</div>
 
     <div class="vorbestell-row">
@@ -813,6 +840,14 @@ function attachHandlers(){
       state.activeBausteinIds.push(id);
     }
     saveActiveBausteine(state.activeBausteinIds);
+    render();
+  });
+
+  // Specials antippen -> direkt als Posten hinzufügen.
+  document.querySelectorAll('[data-add-special]').forEach(btn=>btn.onclick=()=>{
+    const s = SPECIALS.find(x=>x.id===btn.dataset.addSpecial);
+    if(!s) return;
+    addItem(s.price, s.label, null);
     render();
   });
 
