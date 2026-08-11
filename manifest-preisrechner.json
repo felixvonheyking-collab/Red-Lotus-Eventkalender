@@ -1,0 +1,25 @@
+{
+  "name": "Red Lotus Preisrechner",
+  "short_name": "Preisrechner",
+  "description": "Preise antippen, Gesamtsumme und Wechselgeld berechnen",
+  "start_url": "./preisrechner.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1c1b1a",
+  "theme_color": "#1c1b1a",
+  "icons": [
+    {
+      "src": "icon-192-pr.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512-pr.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
