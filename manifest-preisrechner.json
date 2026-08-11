@@ -5,7 +5,7 @@
   "start_url": "./preisrechner.html",
   "scope": "./",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "any",
   "background_color": "#1c1b1a",
   "theme_color": "#1c1b1a",
   "icons": [
