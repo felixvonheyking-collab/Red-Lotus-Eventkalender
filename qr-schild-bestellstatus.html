@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Red Lotus · QR-Schild Bestellstatus (zum Drucken)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Work+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  @page{ size:A5 portrait; margin:0; }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;font-family:'Work Sans',sans-serif;background:#1c1b1a;color:#f6efe2;
+    display:flex;align-items:center;justify-content:center;min-height:100vh;
+  }
+  .sign{
+    width:400px;background:linear-gradient(160deg,#2a2726,#1c1b1a);
+    border:2px solid #c9a35e;border-radius:22px;padding:34px 28px;text-align:center;
+  }
+  .wordmark{font-family:'Marcellus',serif;font-size:26px;letter-spacing:0.03em;margin-bottom:2px;}
+  .sub{font-size:12px;color:#e4cf9c;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:22px;}
+  .qr-box{background:#fff;padding:18px;border-radius:16px;display:inline-block;margin-bottom:20px;}
+  #qrcode{line-height:0;}
+  h2{font-family:'Marcellus',serif;font-size:21px;margin:0 0 8px;color:#f6efe2;}
+  p{font-size:13.5px;line-height:1.6;color:#e9ddc6;margin:0;}
+  .steps{text-align:left;font-size:13px;margin-top:16px;padding-left:20px;color:#e9ddc6;}
+  .steps li{margin-bottom:5px;}
+  @media print{
+    body{background:#fff;}
+    .sign{border-color:#8f1d33;}
+  }
+</style>
+</head>
+<body>
+  <div class="sign">
+    <div class="wordmark">Red Lotus</div>
+    <div class="sub">Asian Food</div>
+    <div class="qr-box"><div id="qrcode"></div></div>
+    <h2>Status deiner Bestellung</h2>
+    <ol class="steps">
+      <li>QR-Code scannen</li>
+      <li>Deine Bestellnummer eingeben</li>
+      <li>Siehst live, wann's fertig ist</li>
+    </ol>
+    <p style="margin-top:14px;">Kein Login, keine App-Installation nötig.</p>
+  </div>
+  <script>
+    new QRCode(document.getElementById("qrcode"), {
+      text: "https://felixvonheyking-collab.github.io/red-lotus-eventkalender/bestellstatus.html",
+      width: 220,
+      height: 220,
+      colorDark: "#1c1b1a",
+      colorLight: "#ffffff",
+      correctLevel: QRCode.CorrectLevel.M
+    });
+  </script>
+</body>
+</html>

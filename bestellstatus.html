@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>Red Lotus · Bestellstatus</title>
+<meta name="theme-color" content="#1c1b1a">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Work+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#1c1b1a; --ink-2:#2a2726; --ink-3:#3a3634;
+  --red:#8f1d33; --red-deep:#6b1526; --red-bright:#b02942;
+  --gold:#c9a35e; --gold-soft:#e4cf9c; --cream:#f6efe2;
+  --ok:#5c8362; --line:rgba(201,163,94,0.18);
+}
+*{box-sizing:border-box;}
+html,body{height:100%;margin:0;}
+body{
+  background:
+    radial-gradient(1000px 500px at 10% -10%, rgba(143,29,51,0.25), transparent 60%),
+    var(--ink);
+  color:var(--cream);font-family:'Work Sans',sans-serif;-webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;align-items:center;min-height:100%;padding:28px 18px 40px;
+}
+.wordmark{font-family:'Marcellus',serif;letter-spacing:0.04em;}
+.brand-mark{
+  width:76px;height:76px;border-radius:50%;
+  display:block;object-fit:cover;margin-bottom:10px;
+  box-shadow:0 4px 14px rgba(0,0,0,0.4);
+}
+h1{font-size:22px;margin:0 0 2px;text-align:center;}
+.sub{font-size:12px;color:var(--gold-soft);opacity:0.85;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:26px;text-align:center;}
+
+.card{
+  width:100%;max-width:360px;background:var(--ink-2);border:1px solid var(--line);
+  border-radius:18px;padding:22px 20px;box-shadow:0 12px 32px rgba(0,0,0,0.35);text-align:center;
+}
+.field label{display:block;font-size:12px;color:var(--gold-soft);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;}
+.field input{
+  width:100%;background:var(--ink-3);border:1px solid var(--line);color:var(--cream);
+  padding:16px;border-radius:12px;font-size:28px;text-align:center;font-family:'Marcellus',serif;
+  letter-spacing:0.03em;
+}
+.field input:focus{outline:none;border-color:var(--gold);}
+.btn{
+  width:100%;margin-top:16px;background:linear-gradient(135deg, var(--gold), #a9813f);
+  color:#241c0f;border:none;padding:14px;border-radius:12px;font-size:15px;font-weight:700;
+  cursor:pointer;font-family:'Work Sans',sans-serif;
+}
+.btn:disabled{opacity:0.5;}
+.hint{font-size:11.5px;color:var(--cream);opacity:0.6;margin-top:14px;line-height:1.5;}
+.err{background:rgba(176,41,66,0.2);border:1px solid var(--red-bright);color:#f2c9d1;
+  padding:10px 12px;border-radius:8px;font-size:13px;margin-top:14px;}
+
+/* Status-Ansicht */
+.status-view{display:none;}
+.status-view.show{display:block;}
+.order-no{font-family:'Marcellus',serif;font-size:15px;color:var(--gold-soft);margin-bottom:16px;}
+.status-badge{
+  border-radius:16px;padding:26px 18px;margin-bottom:16px;
+}
+.status-badge .icon{font-size:44px;margin-bottom:8px;}
+.status-badge .label{font-family:'Marcellus',serif;font-size:22px;}
+.status-badge.wait{background:rgba(201,163,94,0.12);border:1px solid var(--gold);}
+.status-badge.ready{background:rgba(92,131,98,0.18);border:1px solid var(--ok);}
+.status-badge.ready .label{color:#bfe0c4;}
+.status-badge.notfound{background:rgba(176,41,66,0.15);border:1px solid var(--red-bright);}
+.items-list{text-align:left;font-size:13px;opacity:0.85;margin:0 0 16px;padding-left:18px;}
+.items-list li{margin-bottom:3px;}
+.dine-tag{
+  display:inline-block;font-size:11.5px;padding:3px 10px;border-radius:20px;
+  background:var(--ink-3);border:1px solid var(--line);color:var(--gold-soft);margin-bottom:14px;
+}
+.again-btn{
+  width:100%;background:transparent;border:1px solid var(--line);color:var(--cream);
+  padding:11px;border-radius:10px;font-size:13px;cursor:pointer;font-family:'Work Sans',sans-serif;
+}
+.spin{
+  display:inline-block;width:14px;height:14px;border:2px solid rgba(0,0,0,0.25);
+  border-top-color:#241c0f;border-radius:50%;animation:sp .7s linear infinite;margin-right:8px;vertical-align:-2px;
+}
+@keyframes sp{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+<img class="brand-mark" src="logo-maneki.png" alt="Red Lotus">
+<h1 class="wordmark">Red Lotus</h1>
+<div class="sub">Bestellstatus</div>
+
+<div class="card" id="card">
+  <div id="lookupView">
+    <div class="field">
+      <label>Deine Bestellnummer</label>
+      <input type="number" inputmode="numeric" pattern="[0-9]*" id="nrInput" placeholder="z. B. 12" autofocus>
+    </div>
+    <button type="button" class="btn" id="lookupBtn">Status anzeigen</button>
+    <div id="errBox"></div>
+    <div class="hint">Die Nummer hast du beim Bestellen an der Kasse genannt bekommen.</div>
+    <div class="hint">Wir merken uns deine zuletzt eingegebene Bestellnummer nur lokal auf diesem Gerät, für 3 Stunden.</div>
+  </div>
+
+  <div class="status-view" id="statusView">
+    <div class="order-no">Bestellung <b id="statusNo"></b></div>
+    <div id="statusBadgeWrap"></div>
+    <div id="itemsWrap"></div>
+    <button type="button" class="again-btn" id="againBtn">Andere Nummer prüfen</button>
+  </div>
+</div>
+
+<script>
+const STATUS_URL = "https://us-central1-red-lotus-eventkalender.cloudfunctions.net/getOrderStatus";
+let pollTimer = null;
+let currentNr = null;
+
+/* Merkt sich die zuletzt geprüfte Bestellnummer nur lokal auf diesem Gerät
+   (kein Cookie, kein Server, keine Übertragung) und ausschließlich für die
+   unmittelbare Nutzung — läuft nach 3 Stunden automatisch ab, damit die
+   Speicherung eng auf den vom Kunden gewünschten Dienst (eigenen Status
+   prüfen) beschränkt bleibt. */
+const REMEMBER_KEY = 'rl_bestellstatus_letzte_nr';
+const REMEMBER_MS = 3 * 60 * 60 * 1000; // 3 Stunden
+
+function rememberNr(nr){
+  try{
+    localStorage.setItem(REMEMBER_KEY, JSON.stringify({ nr, ts: Date.now() }));
+  }catch(e){ /* localStorage evtl. blockiert — dann einfach nicht merken */ }
+}
+function recallNr(){
+  try{
+    const raw = localStorage.getItem(REMEMBER_KEY);
+    if(!raw) return null;
+    const data = JSON.parse(raw);
+    if(!data || !data.nr || !data.ts) return null;
+    if(Date.now() - data.ts > REMEMBER_MS){
+      localStorage.removeItem(REMEMBER_KEY);
+      return null;
+    }
+    return data.nr;
+  }catch(e){ return null; }
+}
+
+function esc(s){ return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function stopPoll(){ if(pollTimer){ clearInterval(pollTimer); pollTimer = null; } }
+
+async function checkStatus(nr, isPoll){
+  const errBox = document.getElementById('errBox');
+  const lookupBtn = document.getElementById('lookupBtn');
+  if(!isPoll){ errBox.innerHTML = ''; lookupBtn.disabled = true; lookupBtn.innerHTML = '<span class="spin"></span>Suche…'; }
+  try{
+    const res = await fetch(STATUS_URL + '?nr=' + encodeURIComponent(nr));
+    const data = await res.json();
+    if(!data.ok){ throw new Error(data.error || 'Unbekannter Fehler'); }
+
+    document.getElementById('lookupView').style.display = 'none';
+    document.getElementById('statusView').classList.add('show');
+    document.getElementById('statusNo').textContent = '#' + nr;
+
+    const badgeWrap = document.getElementById('statusBadgeWrap');
+    const itemsWrap = document.getElementById('itemsWrap');
+
+    if(!data.found){
+      badgeWrap.innerHTML = `
+        <div class="status-badge notfound">
+          <div class="icon">🔍</div>
+          <div class="label">Nicht gefunden</div>
+        </div>`;
+      itemsWrap.innerHTML = '<div class="hint">Bestellnummer nicht bekannt — evtl. falsch eingegeben, oder es ist noch keine Bestellung mit dieser Nummer heute erfasst.</div>';
+      stopPoll();
+      return;
+    }
+
+    if(data.status === 'fertig'){
+      badgeWrap.innerHTML = `
+        <div class="status-badge ready">
+          <div class="icon">✅</div>
+          <div class="label">Bereit zur Abholung!</div>
+        </div>`;
+      stopPoll();
+    } else if(data.status === 'archiviert'){
+      badgeWrap.innerHTML = `
+        <div class="status-badge notfound">
+          <div class="icon">🔍</div>
+          <div class="label">Nicht mehr aktiv</div>
+        </div>`;
+      itemsWrap.innerHTML = '<div class="hint">Diese Bestellung ist nicht mehr aktiv (evtl. schon abgeholt oder Session zurückgesetzt).</div>';
+      stopPoll();
+    } else {
+      badgeWrap.innerHTML = `
+        <div class="status-badge wait">
+          <div class="icon">🧑‍🍳</div>
+          <div class="label">Wird zubereitet…</div>
+        </div>`;
+    }
+
+    if(data.status !== 'archiviert'){
+      const dineLabel = data.dineMode === 'hier' ? '🍽️ Hier essen' : '🥡 To-Go';
+      let html = `<div class="dine-tag">${dineLabel}</div>`;
+      if(data.items && data.items.length){
+        html += `<ul class="items-list">${data.items.map(i=>`<li>${esc(i)}</li>`).join('')}</ul>`;
+      }
+      itemsWrap.innerHTML = html;
+    }
+  }catch(e){
+    if(!isPoll){
+      errBox.innerHTML = `<div class="err">Konnte Status nicht laden: ${esc(e.message||e)}</div>`;
+    }
+  }finally{
+    if(!isPoll){ lookupBtn.disabled = false; lookupBtn.textContent = 'Status anzeigen'; }
+  }
+}
+
+document.getElementById('lookupBtn').onclick = ()=>{
+  const val = document.getElementById('nrInput').value.trim();
+  const nr = parseInt(val, 10);
+  if(!val || isNaN(nr) || nr <= 0){
+    document.getElementById('errBox').innerHTML = '<div class="err">Bitte eine gültige Bestellnummer eingeben.</div>';
+    return;
+  }
+  currentNr = nr;
+  rememberNr(nr);
+  checkStatus(nr, false);
+  stopPoll();
+  pollTimer = setInterval(()=> checkStatus(nr, true), 6000);
+};
+document.getElementById('nrInput').onkeydown = (ev)=>{
+  if(ev.key === 'Enter') document.getElementById('lookupBtn').click();
+};
+document.getElementById('againBtn').onclick = ()=>{
+  stopPoll();
+  try{ localStorage.removeItem(REMEMBER_KEY); }catch(e){}
+  document.getElementById('statusView').classList.remove('show');
+  document.getElementById('lookupView').style.display = 'block';
+  document.getElementById('nrInput').value = '';
+  document.getElementById('nrInput').focus();
+};
+
+// Falls die Nummer direkt in der URL mitgegeben wird (?nr=12) — z. B. für
+// spätere Erweiterung mit individuellem QR-Code pro Bestellung. Sonst: die
+// zuletzt gemerkte Nummer (falls < 3h alt) automatisch vorausfüllen und
+// gleich abfragen, damit der Kunde beim erneuten Öffnen nicht neu tippen muss.
+const params = new URLSearchParams(location.search);
+const prefillNr = params.get('nr') || recallNr();
+if(prefillNr){
+  document.getElementById('nrInput').value = prefillNr;
+  document.getElementById('lookupBtn').click();
+}
+</script>
+</body>
+</html>
