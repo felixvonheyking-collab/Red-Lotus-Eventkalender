@@ -188,6 +188,9 @@ import {
   getFirestore, initializeFirestore, doc, collection, onSnapshot, updateDoc,
   addDoc, deleteDoc, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js';
+import {
+  getMessaging, getToken, isSupported as isMessagingSupported
+} from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-messaging.js';
 
 function showFatalError(title, detail){
   const el = document.getElementById('app');
@@ -220,6 +223,48 @@ const auth = getAuth(fbApp);
 const db = initializeFirestore(fbApp, { experimentalAutoDetectLongPolling: true }, "default");
 const googleProvider = new GoogleAuthProvider();
 
+/* ============================= PUSH-BENACHRICHTIGUNGEN (FCM) ============================= */
+// Gleiches Projekt/Zertifikat wie im Kalender — ein einmal aktiviertes Gerät
+// bekommt Erinnerungen, unabhängig davon, über welche der beiden Apps es
+// registriert wurde.
+const VAPID_KEY = "BA4mfX39KrU8pt-n5UL_DtUAZ-VUzgO0OBjO1X7a1GVhxs4--77d9PHXbhdLdKhZNMB4SQ4qyIKht0mNi5575hQ";
+const REGISTER_PUSH_URL = "https://us-central1-red-lotus-eventkalender.cloudfunctions.net/registerPushToken?key=rl_wix_h7k2m9p4";
+
+async function enablePushNotifications(){
+  try{
+    if(!('serviceWorker' in navigator) || !('Notification' in window)){
+      alert('Push-Benachrichtigungen werden von diesem Browser nicht unterstützt.');
+      return;
+    }
+    const supported = await isMessagingSupported().catch(()=>false);
+    if(!supported){
+      alert('Push-Benachrichtigungen werden von diesem Browser/Gerät nicht unterstützt (z. B. iOS: App muss zum Home-Bildschirm hinzugefügt sein).');
+      return;
+    }
+    const permission = await Notification.requestPermission();
+    if(permission !== 'granted'){
+      alert('Berechtigung für Benachrichtigungen wurde nicht erteilt.');
+      return;
+    }
+    const reg = await navigator.serviceWorker.register('firebase-messaging-sw.js');
+    const messaging = getMessaging(fbApp);
+    const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
+    if(!token){
+      alert('Kein Push-Token erhalten — bitte erneut versuchen.');
+      return;
+    }
+    await fetch(REGISTER_PUSH_URL, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ token, email: (state.authUser && state.authUser.email) || '' })
+    });
+    state.pushEnabled = true;
+    render();
+  }catch(e){
+    alert('Push-Benachrichtigungen konnten nicht aktiviert werden: '+(e.message||e));
+  }
+}
+
 function escapeHtml(s){
   return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -236,7 +281,8 @@ const state = {
   showErledigt: false,
   showWiedervorlage: false,
   snoozeFormFor: null, // itemId, für das gerade das Datumsfeld offen ist
-  noteFormOpen: false
+  noteFormOpen: false,
+  pushEnabled: false
 };
 let unsubSuggestions = null;
 let unsubItems = null;
@@ -368,6 +414,15 @@ async function createNote(fields){
       status: 'inbox', snoozeUntil: null,
       createdAt: serverTimestamp(), updatedAt: serverTimestamp()
     });
+    if(fields.reminderAt){
+      await addDoc(collection(db,'reminders'), {
+        text: (fields.subject ? fields.subject+' — ' : '') + (fields.summary||''),
+        dueAt: fields.reminderAt, // "YYYY-MM-DDTHH:MM", lokale Zeit
+        forEmail: (state.authUser && state.authUser.email) || '',
+        sent: false,
+        createdAt: serverTimestamp()
+      });
+    }
     state.noteFormOpen = false; render();
   }catch(e){ alert('Notiz konnte nicht gespeichert werden: '+(e.message||e)); }
 }
@@ -509,6 +564,10 @@ function renderNoteForm(){
     </div>
     <label>Notiz</label>
     <textarea id="note-summary" placeholder="Worum ging's, was ist zu tun?"></textarea>
+    <div style="margin-top:10px;">
+      <label>Erinnerung (optional) ${state.pushEnabled ? '' : '— erst "Erinnerungen aktivieren" oben nötig, sonst kommt keine Benachrichtigung an'}</label>
+      <input type="datetime-local" id="note-reminder">
+    </div>
     <div style="display:flex;gap:8px;margin-top:12px;">
       <button type="button" class="btn gold sm" id="saveNoteBtn">Speichern</button>
       <button type="button" class="btn ghost sm" id="cancelNoteBtn">Abbrechen</button>
@@ -594,7 +653,9 @@ function render(){
     <div class="app">
       ${renderStatsRow()}
       <div class="toolbar-row" style="margin-top:0;">
-        <span></span>
+        ${state.pushEnabled
+          ? `<span class="draft-status">🔔 Erinnerungen aktiv</span>`
+          : `<button type="button" class="btn ghost sm" id="enablePushBtn">🔔 Erinnerungen aktivieren</button>`}
         <button type="button" class="btn gold sm" id="openNoteBtn">📞 + Telefon-/Gesprächsnotiz</button>
       </div>
       ${renderNoteForm()}
@@ -632,9 +693,12 @@ function render(){
     createNote({
       subject: document.getElementById('note-subject').value.trim(),
       dringlichkeit: document.getElementById('note-dringlichkeit').value,
-      summary: document.getElementById('note-summary').value.trim()
+      summary: document.getElementById('note-summary').value.trim(),
+      reminderAt: document.getElementById('note-reminder').value || null
     });
   };
+  const enablePushBtn = document.getElementById('enablePushBtn');
+  if(enablePushBtn) enablePushBtn.onclick = enablePushNotifications;
 }
 function attachHeaderHandlers(){
   const logoutBtn = document.getElementById('logoutBtn');

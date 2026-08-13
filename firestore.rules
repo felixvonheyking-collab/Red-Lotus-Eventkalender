@@ -1,0 +1,81 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Nur diese E-Mail-Adressen dürfen lesen/schreiben.
+    function isTeamMember() {
+      return request.auth != null &&
+        request.auth.token.email in [
+          'info@redlotus-asianfood.com',
+          'beepowpaw@gmail.com',
+          'felix.vonheyking@gmail.com',
+          'redlotus.asianfood@gmail.com',
+          'lukas.laemmle@icloud.com',
+          'kontakt@reka-restaurant.de'
+        ];
+    }
+
+    match /{document=**} {
+      allow read, write: if isTeamMember();
+    }
+
+    // Bestellsystem (Küchen-/Kundenbildschirm/Preisrechner): läuft ohne
+    // Login auf fest montierten Tablets. Lesen ist öffentlich (nur Nummer +
+    // Gerichte, keine Kundendaten). Erstellt werden Bestellungen
+    // ausschließlich über die Cloud Function "createOrder" (Admin-SDK,
+    // umgeht diese Regeln). Von den Bildschirmen aus dürfen nur Status,
+    // Zeitstempel, die einzelnen Gericht-Abhak-Zustände ("items"), der
+    // Bezahlt-Status ("paid", wichtig für Vorbestellungen) und die
+    // Küchen-Freigabe ("released" — steuert, ob eine Vorbestellung schon
+    // auf dem Küchenboard sichtbar ist) geändert werden.
+    match /orders/{orderId} {
+      allow read: if true;
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'readyAt', 'items', 'paid', 'released']);
+      allow create, delete: if false;
+    }
+
+    // REIS!-Alarm: einfaches gemeinsames Signal zwischen Küchenbildschirm
+    // und Preisrechner, ohne Login. Enthält keine sensiblen Daten.
+    match /alerts/{alertId} {
+      allow read, write: if true;
+    }
+
+    // Alice (E-Mail-Sekretärin): ein Dokument pro Mail-Thread oder manueller
+    // Notiz (statt Tages-Blob), damit Erledigt-Status und Wiedervorlage-Datum
+    // dauerhaft erhalten bleiben. Mail-Items ("source":"mail") legt/aktualisiert
+    // ausschließlich die Cloud Function "secretaryApi" an (Admin-SDK, umgeht
+    // diese Regeln). Das Team darf im Dashboard nur den Status/das
+    // Wiedervorlage-Datum ändern — und eigene Telefon-/Gesprächsnotizen
+    // ("source":"notiz") komplett selbst anlegen, ändern und löschen.
+    match /secretary_items/{itemId} {
+      allow read: if isTeamMember();
+      allow update: if isTeamMember() && (
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'snoozeUntil', 'updatedAt']) ||
+        (resource.data.source == 'notiz' && request.resource.data.source == 'notiz')
+      );
+      allow create: if isTeamMember() && request.resource.data.source == 'notiz';
+      allow delete: if isTeamMember() && resource.data.source == 'notiz';
+    }
+
+    // Alice: Kalender-Vorschläge aus erkannten Buchungsanfragen. Anlegen und
+    // Löschen nur über die Cloud Function. Das Team darf im Dashboard nur den
+    // Status ändern (freigeben/ablehnen) — Alice übernimmt freigegebene
+    // Vorschläge beim nächsten Lauf in den echten Kalender.
+    match /calendar_suggestions/{suggestionId} {
+      allow read: if isTeamMember();
+      allow update: if isTeamMember() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
+      allow create, delete: if false;
+    }
+
+    // Erinnerungen ("Wecker"-Funktion von Alice): Team legt sie selbst an
+    // und darf sie vor dem Fälligwerden ändern/löschen. Das Feld "sent"
+    // (ob die Push-Benachrichtigung schon rausgegangen ist) setzt
+    // ausschließlich die Cloud Function "sendDueReminders".
+    match /reminders/{reminderId} {
+      allow read: if isTeamMember();
+      allow create: if isTeamMember() && request.resource.data.sent == false;
+      allow update: if isTeamMember() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'dueAt']);
+      allow delete: if isTeamMember();
+    }
+  }
+}

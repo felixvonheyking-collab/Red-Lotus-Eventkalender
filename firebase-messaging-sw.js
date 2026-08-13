@@ -1,11 +1,12 @@
-// Red Lotus — Service Worker für Push-Benachrichtigungen (Firebase Cloud Messaging).
-// Diese Datei muss im GitHub-Pages-Repo GENAU in diesem Namen im Root-Verzeichnis
-// liegen (neben index.html), sonst findet der Browser sie nicht.
+// Red Lotus — Firebase Cloud Messaging Service Worker.
+// Wird von jeder App im selben Ordner (Kalender, Alice, ...) über
+// navigator.serviceWorker.register('firebase-messaging-sw.js') genutzt, um
+// Push-Benachrichtigungen zu empfangen, auch wenn die Seite gerade nicht
+// offen ist. Muss im Wurzelverzeichnis liegen (gleiche Ebene wie index.html),
+// damit der Standard-Scope alle Unterseiten abdeckt.
+importScripts('https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/12.15.0/firebase-messaging-compat.js');
 
-importScripts("https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js");
-importScripts("https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js");
-
-// Gleiche Firebase-Projektdaten wie in index.html / einkaufsliste.html.
 firebase.initializeApp({
   apiKey: "AIzaSyA0y6NWpF3N7241mA72Cj-gU_pvbqpNdD4",
   authDomain: "red-lotus-eventkalender.firebaseapp.com",
@@ -17,20 +18,14 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// Push-Benachrichtigung anzeigen, wenn die App im Hintergrund ist / nicht offen ist.
+// Zeigt eingehende Push-Nachrichten an, wenn keine Registerkarte der Seite
+// im Vordergrund ist (Hintergrund-/geschlossener-Browser-Fall).
 messaging.onBackgroundMessage((payload) => {
-  const title = (payload.notification && payload.notification.title) || "Red Lotus Kalender";
-  const body = (payload.notification && payload.notification.body) || "";
+  const title = (payload.notification && payload.notification.title) || 'Red Lotus';
+  const body = (payload.notification && payload.notification.body) || '';
   self.registration.showNotification(title, {
     body,
-    icon: "icon-192.png" // vorhandenes App-Icon, falls anderer Dateiname: hier anpassen
+    icon: 'icon-192.png',
+    badge: 'icon-192.png'
   });
-});
-
-// Klick auf die Benachrichtigung öffnet den Kalender.
-self.addEventListener("notificationclick", (event) => {
-  event.notification.close();
-  event.waitUntil(
-    clients.openWindow("https://felixvonheyking-collab.github.io/Event-Kalender-red-lotus/")
-  );
 });
