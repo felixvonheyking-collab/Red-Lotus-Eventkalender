@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Red Lotus · Alice (Sekretärin)</title>
+<meta name="theme-color" content="#1c1b1a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Alice">
+<link rel="manifest" href="manifest-alice.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#1c1b1a; --ink-2:#2a2726; --ink-3:#3a3634;
+  --red:#8f1d33; --red-deep:#6b1526; --red-bright:#b02942;
+  --gold:#c9a35e; --gold-soft:#e4cf9c; --cream:#f6efe2; --cream-dim:#e9ddc6;
+  --line:rgba(201,163,94,0.28); --ok:#5c8362; --warn:#c9793e;
+  --shadow:0 12px 32px rgba(0,0,0,0.35);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(143,29,51,0.25), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(201,163,94,0.12), transparent 55%),
+    var(--ink);
+  color:var(--cream);
+  font-family:'Work Sans',sans-serif;
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+.wordmark{font-family:'Marcellus',serif;letter-spacing:0.04em;}
+.app{max-width:900px;margin:0 auto;padding:20px 16px 80px;}
+header.top{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px;border-radius:16px;
+  background:linear-gradient(135deg, var(--ink-2), var(--ink-3));
+  border:1px solid var(--line);box-shadow:var(--shadow);
+  margin-bottom:18px;gap:12px;flex-wrap:wrap;
+}
+.brand{display:flex;align-items:center;gap:12px;}
+.brand-mark{
+  width:44px;height:44px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%, var(--red-bright), var(--red-deep) 70%);
+  border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;
+  font-family:'Marcellus',serif;color:var(--gold-soft);font-size:20px;flex-shrink:0;
+}
+.brand h1{font-size:19px;margin:0;font-weight:600;}
+.brand .sub{font-size:11.5px;color:var(--gold-soft);opacity:0.85;letter-spacing:0.08em;text-transform:uppercase;}
+nav.suite-nav{display:flex;gap:6px;flex-wrap:wrap;}
+nav.suite-nav a{
+  text-decoration:none;color:var(--cream);border:1px solid var(--line);
+  padding:7px 12px;border-radius:9px;font-size:12.5px;font-weight:600;white-space:nowrap;
+}
+nav.suite-nav a:hover{border-color:var(--gold);}
+nav.suite-nav a.active{background:var(--red);border-color:var(--red-bright);color:#fff;}
+
+button{font-family:'Work Sans',sans-serif;}
+.btn{
+  background:var(--red);color:#fff;border:none;padding:9px 14px;border-radius:9px;
+  cursor:pointer;font-size:13px;font-weight:600;letter-spacing:0.01em;transition:background .15s;
+}
+.btn:hover{background:var(--red-bright);}
+.btn.gold{background:var(--gold);color:var(--ink);}
+.btn.gold:hover{background:var(--gold-soft);}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--cream);}
+.btn.ghost:hover{border-color:var(--gold);}
+.btn.ok{background:var(--ok);color:#fff;}
+.btn.ok:hover{background:#6f9a76;}
+.btn.sm{padding:6px 10px;font-size:12px;border-radius:7px;}
+.btn:disabled{opacity:0.4;cursor:not-allowed;}
+a.link-chip{color:var(--gold-soft);text-decoration:none;border-bottom:1px dotted var(--gold);font-size:13px;}
+a.link-chip:hover{color:#fff;}
+
+.section-title{
+  font-family:'Marcellus',serif;font-size:15px;color:var(--gold-soft);
+  letter-spacing:0.04em;text-transform:uppercase;font-size:13px;
+  margin:26px 0 10px;padding-left:2px;opacity:0.85;
+}
+.card{
+  background:var(--ink-2);border:1px solid var(--line);border-radius:16px;
+  padding:16px 18px;margin-bottom:12px;box-shadow:var(--shadow);
+}
+.card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;}
+.card .subject{font-family:'Marcellus',serif;font-size:16px;margin:0 0 3px;}
+.card .sender{font-size:12.5px;opacity:0.7;}
+.badges{display:flex;gap:6px;flex-wrap:wrap;}
+.badge{
+  font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;
+  text-transform:uppercase;letter-spacing:0.03em;white-space:nowrap;
+}
+.badge.dringend{background:rgba(130,33,17,0.35);color:#f2a78e;border:1px solid #822111;}
+.badge.normal{background:rgba(250,209,101,0.18);color:var(--gold-soft);border:1px solid var(--gold);}
+.badge.spaeter{background:rgba(255,255,255,0.08);color:var(--cream-dim);border:1px solid var(--line);}
+.badge.herkunft{background:rgba(255,255,255,0.06);color:var(--cream-dim);border:1px solid var(--line);}
+.card .snippet{font-size:13.5px;opacity:0.85;margin:8px 0;line-height:1.5;}
+.card-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap;}
+.draft-status{font-size:12px;color:var(--gold-soft);}
+.empty-state{opacity:0.5;text-align:center;padding:40px 20px;font-family:'Marcellus',serif;font-size:16px;}
+
+.suggestion-card .when{font-family:'Marcellus',serif;font-size:20px;color:var(--gold-soft);}
+.suggestion-card .status-pill{font-size:11px;padding:3px 9px;border-radius:20px;text-transform:uppercase;font-weight:700;}
+.status-pill.vorgeschlagen{background:rgba(201,163,94,0.18);color:var(--gold-soft);border:1px solid var(--gold);}
+.status-pill.freigegeben{background:rgba(92,131,98,0.25);color:#9fcda6;border:1px solid var(--ok);}
+.status-pill.angelegt{background:rgba(92,131,98,0.4);color:#fff;border:1px solid var(--ok);}
+.status-pill.abgelehnt{background:rgba(255,255,255,0.05);color:var(--cream-dim);border:1px solid var(--line);opacity:0.6;}
+
+.stats-row{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;
+}
+@media (max-width:640px){.stats-row{grid-template-columns:repeat(2,1fr);}}
+.stat-tile{
+  background:var(--ink-2);border:1px solid var(--line);border-radius:14px;
+  padding:14px 16px;box-shadow:var(--shadow);
+}
+.stat-tile .num{font-family:'Marcellus',serif;font-size:30px;line-height:1;color:var(--gold-soft);}
+.stat-tile.dringend .num{color:#f2a78e;}
+.stat-tile.entwuerfe .num{color:var(--ok);}
+.stat-tile .label{font-size:11px;text-transform:uppercase;letter-spacing:0.05em;opacity:0.65;margin-top:6px;}
+.empty-hero{
+  text-align:center;padding:50px 24px;background:var(--ink-2);border:1px dashed var(--line);
+  border-radius:18px;margin-top:6px;
+}
+.empty-hero .emoji{font-size:40px;margin-bottom:12px;}
+.empty-hero h3{font-family:'Marcellus',serif;font-size:19px;margin:0 0 8px;color:var(--gold-soft);font-weight:400;}
+.empty-hero p{font-size:13.5px;opacity:0.7;max-width:420px;margin:0 auto;line-height:1.6;}
+.folder-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px;}
+.folder-tabs button{
+  background:transparent;border:1px solid var(--line);color:var(--cream-dim);
+  padding:8px 14px;border-radius:20px;font-size:12.5px;font-weight:600;cursor:pointer;
+}
+.folder-tabs button.active{background:var(--red);border-color:var(--red-bright);color:#fff;}
+.folder-tabs button .count{opacity:0.7;font-weight:400;margin-left:3px;}
+.toolbar-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:16px 0 4px;}
+.collapsible-toggle{
+  background:transparent;border:1px dashed var(--line);color:var(--gold-soft);
+  padding:7px 13px;border-radius:9px;font-size:12.5px;cursor:pointer;
+}
+.collapsible-toggle:hover{border-color:var(--gold);}
+.card.muted{opacity:0.65;}
+.card .note-icon{font-size:15px;margin-right:4px;}
+.snooze-form{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap;}
+.snooze-form input[type=date]{
+  background:var(--ink);border:1px solid var(--line);color:var(--cream);
+  padding:7px 9px;border-radius:8px;font-size:13px;font-family:'Work Sans',sans-serif;
+}
+.note-form-card{background:var(--ink-2);border:1px solid var(--gold);border-radius:16px;padding:16px 18px;margin-bottom:16px;}
+.note-form-card .field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+.note-form-card select,.note-form-card input[type=text],.note-form-card textarea{
+  width:100%;background:var(--ink);border:1px solid var(--line);color:var(--cream);
+  padding:8px 10px;border-radius:9px;font-size:13.5px;font-family:'Work Sans',sans-serif;
+}
+.note-form-card textarea{min-height:70px;resize:vertical;}
+.note-form-card label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:var(--gold-soft);margin-bottom:4px;opacity:0.85;}
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:90vh;padding:20px;}
+.login-card{
+  background:var(--ink-2);border:1px solid var(--line);border-radius:18px;
+  padding:32px 28px;max-width:360px;width:100%;text-align:center;box-shadow:var(--shadow);
+}
+.login-card .sub{font-size:12px;color:var(--gold-soft);opacity:0.8;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:22px;}
+.login-error{background:rgba(130,33,17,0.3);border:1px solid #822111;color:#f2a78e;padding:9px 12px;border-radius:9px;font-size:12.5px;margin-bottom:14px;}
+.login-hint{font-size:11.5px;opacity:0.5;margin-top:14px;}
+.field{margin-bottom:14px;text-align:left;}
+label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--gold-soft);margin-bottom:5px;opacity:0.9;}
+input[type=email],input[type=password]{
+  width:100%;background:var(--ink);border:1px solid var(--line);color:var(--cream);
+  padding:9px 11px;border-radius:9px;font-size:14px;font-family:'Work Sans',sans-serif;
+}
+input:focus{outline:none;border-color:var(--gold);}
+.spinner{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;margin-right:6px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js';
+import {
+  getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut,
+  GoogleAuthProvider, signInWithPopup
+} from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js';
+import {
+  getFirestore, initializeFirestore, doc, collection, onSnapshot, updateDoc,
+  addDoc, deleteDoc, serverTimestamp
+} from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js';
+
+function showFatalError(title, detail){
+  const el = document.getElementById('app');
+  if(!el) return;
+  el.innerHTML = `<div style="max-width:600px;margin:60px auto;padding:20px;background:#2a1116;border:1px solid #b02942;border-radius:14px;color:#f6efe2;font-family:sans-serif;">
+    <h2 style="color:#f2c9d1;margin-top:0;">${title}</h2>
+    <p style="font-size:13px;opacity:0.85;white-space:pre-wrap;word-break:break-word;">${(detail||'').toString().replace(/</g,'&lt;')}</p>
+    <p style="font-size:12px;opacity:0.6;">Bitte mach hiervon einen Screenshot.</p>
+  </div>`;
+}
+window.addEventListener('error', (ev)=>{
+  showFatalError('Es ist ein Fehler aufgetreten', (ev.message||'')+' ('+(ev.filename||'')+':'+(ev.lineno||'')+')');
+});
+window.addEventListener('unhandledrejection', (ev)=>{
+  showFatalError('Es ist ein Fehler aufgetreten', ev.reason && ev.reason.message ? ev.reason.message : String(ev.reason));
+});
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA0y6NWpF3N7241mA72Cj-gU_pvbqpNdD4",
+  authDomain: "red-lotus-eventkalender.firebaseapp.com",
+  projectId: "red-lotus-eventkalender",
+  storageBucket: "red-lotus-eventkalender.firebasestorage.app",
+  messagingSenderId: "864967561482",
+  appId: "1:864967561482:web:98ee51f304748e511f2af3"
+};
+const fbApp = initializeApp(firebaseConfig);
+const auth = getAuth(fbApp);
+// Gleicher Datenbank-ID-Hinweis wie in den anderen Apps: die Datenbank heißt
+// wortwörtlich "default", nicht die intern reservierte "(default)".
+const db = initializeFirestore(fbApp, { experimentalAutoDetectLongPolling: true }, "default");
+const googleProvider = new GoogleAuthProvider();
+
+function escapeHtml(s){
+  return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function isoDaysAgo(n){ const d=new Date(); d.setDate(d.getDate()-n); return d.toISOString().slice(0,10); }
+function gmailThreadLink(threadId){ return `https://mail.google.com/mail/u/0/#all/${encodeURIComponent(threadId)}`; }
+
+const state = {
+  authUser: null, authBusy:false, authError:null,
+  loaded:false,
+  items: [], // secretary_items: Mails + manuelle Notizen, ein Dokument je Eintrag
+  suggestions: [],
+  activeTab: 'alle', // alle | info | redlotus | sonstige
+  showErledigt: false,
+  showWiedervorlage: false,
+  snoozeFormFor: null, // itemId, für das gerade das Datumsfeld offen ist
+  noteFormOpen: false
+};
+let unsubSuggestions = null;
+let unsubItems = null;
+const HERKUNFT_INFO = 'info@redlotus-asianfood.com';
+const HERKUNFT_REDLOTUS = 'redlotus.asianfood@gmail.com';
+
+/* ============================= LOGIN ============================= */
+function renderLogin(){
+  return `
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="brand-mark" style="margin:0 auto 10px;">🤖</div>
+      <h1 class="wordmark">Alice</h1>
+      <div class="sub">Red Lotus · E-Mail-Sekretärin</div>
+      ${state.authError ? `<div class="login-error">${escapeHtml(state.authError)}</div>` : ''}
+      <button type="button" class="btn gold" id="googleLoginBtn" ${state.authBusy?'disabled':''} style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:16px;width:100%;">
+        <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.81.54-1.85.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.72A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.29-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.05l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.59-2.59C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>
+        ${state.authBusy?'Anmelden…':'Mit Google anmelden'}
+      </button>
+      <div style="display:flex;align-items:center;gap:10px;margin:14px 0;opacity:0.4;font-size:11px;">
+        <div style="flex:1;height:1px;background:var(--line);"></div>ODER<div style="flex:1;height:1px;background:var(--line);"></div>
+      </div>
+      <div class="field"><label>E-Mail</label><input type="email" id="login-email" autocomplete="username"></div>
+      <div class="field"><label>Passwort</label><input type="password" id="login-pass" autocomplete="current-password"></div>
+      <button type="button" class="btn ghost" id="loginBtn" ${state.authBusy?'disabled':''} style="width:100%;padding:11px;">${state.authBusy?'<span class="spinner"></span>Anmelden…':'Mit E-Mail anmelden'}</button>
+      <div class="login-hint">Gleicher Zugang wie im Red-Lotus-Eventkalender.</div>
+    </div>
+  </div>`;
+}
+function attachLoginHandlers(){
+  const doLogin = async ()=>{
+    const email = document.getElementById('login-email').value.trim();
+    const pass = document.getElementById('login-pass').value;
+    if(!email || !pass){ state.authError='Bitte E-Mail und Passwort eingeben.'; render(); return; }
+    state.authBusy=true; state.authError=null; render();
+    try{ await signInWithEmailAndPassword(auth, email, pass); }
+    catch(e){ state.authBusy=false; state.authError=mapAuthError(e); render(); }
+  };
+  const btn = document.getElementById('loginBtn');
+  if(btn) btn.onclick = doLogin;
+  ['login-email','login-pass'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.onkeydown = (ev)=>{ if(ev.key==='Enter') doLogin(); };
+  });
+  const googleBtn = document.getElementById('googleLoginBtn');
+  if(googleBtn) googleBtn.onclick = async ()=>{
+    state.authBusy=true; state.authError=null; render();
+    try{ await signInWithPopup(auth, googleProvider); }
+    catch(e){ state.authBusy=false; state.authError=mapAuthError(e); render(); }
+  };
+}
+function mapAuthError(e){
+  const code = e && e.code || '';
+  if(code.includes('invalid-credential') || code.includes('wrong-password') || code.includes('user-not-found')) return 'E-Mail oder Passwort ist falsch.';
+  if(code.includes('too-many-requests')) return 'Zu viele Versuche. Bitte kurz warten und erneut versuchen.';
+  if(code.includes('invalid-email')) return 'Diese E-Mail-Adresse ist ungültig.';
+  if(code.includes('popup-closed-by-user') || code.includes('cancelled-popup-request')) return 'Google-Anmeldung abgebrochen.';
+  if(code.includes('popup-blocked')) return 'Der Anmelde-Pop-up wurde blockiert. Bitte Pop-ups erlauben.';
+  if(code === 'permission-denied' || code.includes('permission-denied')) return 'Dieses Konto ist nicht freigeschaltet. Bitte bei Felix melden.';
+  return 'Anmeldung fehlgeschlagen: '+(e.message||e);
+}
+
+/* ============================= DATEN LADEN ============================= */
+function startSync(){
+  let itemsReady=false, suggestionsReady=false;
+  const maybeDone = ()=>{ if(itemsReady && suggestionsReady){ state.loaded=true; } render(); };
+
+  unsubItems = onSnapshot(collection(db,'secretary_items'), (snap)=>{
+    const list = [];
+    snap.forEach(d=>list.push({ id:d.id, ...d.data() }));
+    // Dringend zuerst, dann Normal, dann Später/Notizen; innerhalb dessen neueste zuerst.
+    const order = { Dringend:0, Normal:1, 'Später':2 };
+    list.sort((a,b)=>{
+      const oa = order[a.dringlichkeit] ?? 3, ob = order[b.dringlichkeit] ?? 3;
+      if(oa!==ob) return oa-ob;
+      return (b.id||'').localeCompare(a.id||'');
+    });
+    state.items = list;
+    itemsReady = true; maybeDone();
+  }, (e)=>{ console.error('Items laden fehlgeschlagen', e); itemsReady=true; maybeDone(); });
+
+  unsubSuggestions = onSnapshot(collection(db,'calendar_suggestions'), (snap)=>{
+    const list = [];
+    snap.forEach(d=>list.push({ id:d.id, ...d.data() }));
+    list.sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+    state.suggestions = list;
+    suggestionsReady = true; maybeDone();
+  }, (e)=>{ console.error('Vorschläge laden fehlgeschlagen', e); suggestionsReady=true; maybeDone(); });
+}
+function stopSync(){
+  if(unsubSuggestions){ unsubSuggestions(); unsubSuggestions=null; }
+  if(unsubItems){ unsubItems(); unsubItems=null; }
+  state.items = []; state.suggestions = [];
+}
+
+async function setSuggestionStatus(id, status){
+  try{ await updateDoc(doc(db,'calendar_suggestions', id), { status }); }
+  catch(e){ alert('Konnte Status nicht ändern: '+(e.message||e)); }
+}
+
+/* ---- Erledigt / Wiedervorlage ---- */
+async function setItemStatus(id, status){
+  try{ await updateDoc(doc(db,'secretary_items', id), { status, updatedAt: serverTimestamp() }); }
+  catch(e){ alert('Konnte Status nicht ändern: '+(e.message||e)); }
+}
+async function setSnooze(id, dateStr){
+  if(!dateStr) return;
+  try{
+    await updateDoc(doc(db,'secretary_items', id), { snoozeUntil: dateStr, status:'inbox', updatedAt: serverTimestamp() });
+    state.snoozeFormFor = null; render();
+  }catch(e){ alert('Konnte Wiedervorlage nicht setzen: '+(e.message||e)); }
+}
+async function clearSnooze(id){
+  try{ await updateDoc(doc(db,'secretary_items', id), { snoozeUntil: null, updatedAt: serverTimestamp() }); }
+  catch(e){ alert('Konnte Wiedervorlage nicht aufheben: '+(e.message||e)); }
+}
+
+/* ---- Telefon-/Gesprächsnotizen ---- */
+async function createNote(fields){
+  try{
+    await addDoc(collection(db,'secretary_items'), {
+      source:'notiz', threadId:null,
+      subject: fields.subject || '(ohne Betreff)',
+      sender: fields.sender || '',
+      herkunft: fields.herkunft || '',
+      dringlichkeit: fields.dringlichkeit || 'Normal',
+      summary: fields.summary || '',
+      hasDraft: false,
+      status: 'inbox', snoozeUntil: null,
+      createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+    });
+    state.noteFormOpen = false; render();
+  }catch(e){ alert('Notiz konnte nicht gespeichert werden: '+(e.message||e)); }
+}
+async function deleteNote(id){
+  if(!confirm('Notiz wirklich löschen?')) return;
+  try{ await deleteDoc(doc(db,'secretary_items', id)); }
+  catch(e){ alert('Konnte Notiz nicht löschen: '+(e.message||e)); }
+}
+
+/* ============================= RENDER ============================= */
+function renderHeader(){
+  return `
+  <header class="top">
+    <div class="brand">
+      <div class="brand-mark">🤖</div>
+      <div>
+        <h1 class="wordmark">Alice</h1>
+        <div class="sub">E-Mail-Sekretärin</div>
+      </div>
+    </div>
+    <nav class="suite-nav">
+      <a href="index.html">📅 Kalender</a>
+      <a href="einkaufsliste.html">🛒 Einkauf</a>
+      <a href="preisrechner.html">🧮 Preisrechner</a>
+      <a class="active" href="alice.html">🤖 Alice</a>
+    </nav>
+    <button type="button" class="btn ghost sm" id="logoutBtn">Abmelden</button>
+  </header>`;
+}
+
+function badgeForDringlichkeit(d){
+  const cls = d==='Dringend' ? 'dringend' : (d==='Später' ? 'spaeter' : 'normal');
+  return `<span class="badge ${cls}">${escapeHtml(d||'Normal')}</span>`;
+}
+function isSnoozed(it){ return it.snoozeUntil && it.snoozeUntil > todayISO(); }
+function itemsForTab(tab){
+  return state.items.filter(it=>{
+    if(tab==='alle') return true;
+    if(tab==='info') return it.herkunft===HERKUNFT_INFO;
+    if(tab==='redlotus') return it.herkunft===HERKUNFT_REDLOTUS;
+    if(tab==='sonstige') return !it.herkunft || (it.herkunft!==HERKUNFT_INFO && it.herkunft!==HERKUNFT_REDLOTUS);
+    return true;
+  });
+}
+
+function renderStatsRow(){
+  let dringend=0, normal=0, spaeter=0, entwuerfe=0, erledigt=0;
+  state.items.forEach(it=>{
+    if(it.status==='erledigt'){ erledigt++; return; }
+    if(isSnoozed(it)) return;
+    if(it.dringlichkeit==='Dringend') dringend++;
+    else if(it.dringlichkeit==='Später') spaeter++;
+    else normal++;
+    if(it.hasDraft) entwuerfe++;
+  });
+  const tiles = [
+    ['dringend','Dringend offen',dringend],
+    ['','Normal/Später offen',normal+spaeter],
+    ['entwuerfe','Entwürfe wartend',entwuerfe],
+    ['','Erledigt gesamt',erledigt]
+  ];
+  return `<div class="stats-row">
+    ${tiles.map(([cls,label,n])=>`<div class="stat-tile ${cls}"><div class="num">${n}</div><div class="label">${label}</div></div>`).join('')}
+  </div>`;
+}
+
+function renderFolderTabs(){
+  const counts = { alle:0, info:0, redlotus:0, sonstige:0 };
+  state.items.forEach(it=>{
+    if(it.status==='erledigt' || isSnoozed(it)) return;
+    counts.alle++;
+    if(it.herkunft===HERKUNFT_INFO) counts.info++;
+    else if(it.herkunft===HERKUNFT_REDLOTUS) counts.redlotus++;
+    else counts.sonstige++;
+  });
+  const tabs = [
+    ['alle','Alle'], ['info','info@…'], ['redlotus','redlotus.asianfood@…'], ['sonstige','Sonstiges']
+  ];
+  return `<div class="folder-tabs">
+    ${tabs.map(([key,label])=>`<button type="button" data-tab="${key}" class="${state.activeTab===key?'active':''}">${label}<span class="count">${counts[key]}</span></button>`).join('')}
+  </div>`;
+}
+
+function renderItemCard(it, opts){
+  opts = opts||{};
+  const isNote = it.source==='notiz';
+  return `
+      <div class="card ${opts.muted?'muted':''}">
+        <div class="card-head">
+          <div>
+            <p class="subject">${isNote?'<span class="note-icon">📞</span>':''}${escapeHtml(it.subject||'(ohne Betreff)')}</p>
+            <div class="sender">${escapeHtml(it.sender||'')}</div>
+          </div>
+          <div class="badges">
+            ${badgeForDringlichkeit(it.dringlichkeit)}
+            ${it.herkunft ? `<span class="badge herkunft">${escapeHtml(it.herkunft)}</span>` : ''}
+          </div>
+        </div>
+        ${it.summary ? `<div class="snippet">${escapeHtml(it.summary)}</div>` : ''}
+        ${isSnoozed(it) ? `<div class="draft-status">⏰ Wiedervorlage am ${escapeHtml(it.snoozeUntil)}</div>` : ''}
+        <div class="card-foot">
+          ${it.threadId ? `<a class="link-chip" href="${gmailThreadLink(it.threadId)}" target="_blank" rel="noopener">In Gmail öffnen ↗</a>` : `<span></span>`}
+          ${it.hasDraft ? `<span class="draft-status">✓ Antwortentwurf wartet auf Freigabe in Gmail</span>` : ''}
+        </div>
+        <div class="card-foot">
+          ${it.status==='erledigt' ? `
+            <button type="button" class="btn ghost sm" data-reopen="${it.id}">↺ Wieder aufnehmen</button>
+            <span></span>
+          ` : `
+            <button type="button" class="btn ok sm" data-done="${it.id}">✓ Erledigt</button>
+            ${isSnoozed(it)
+              ? `<button type="button" class="btn ghost sm" data-clear-snooze="${it.id}">Wiedervorlage aufheben</button>`
+              : `<button type="button" class="btn ghost sm" data-snooze="${it.id}">⏰ Wiedervorlage</button>`}
+          `}
+          ${isNote ? `<button type="button" class="btn ghost sm" data-delete-note="${it.id}">Löschen</button>` : ''}
+        </div>
+        ${state.snoozeFormFor===it.id ? `
+          <div class="snooze-form">
+            <input type="date" id="snooze-date-${it.id}" min="${todayISO()}" value="${isoDaysAgo(-3)}">
+            <button type="button" class="btn gold sm" data-confirm-snooze="${it.id}">Auf Wiedervorlage legen</button>
+          </div>
+        ` : ''}
+      </div>`;
+}
+
+function renderNoteForm(){
+  if(!state.noteFormOpen) return '';
+  return `
+  <div class="note-form-card">
+    <div class="field-row">
+      <div><label>Von wem / worüber</label><input type="text" id="note-subject" placeholder="z. B. Telefonat mit Frau Meier"></div>
+      <div><label>Dringlichkeit</label>
+        <select id="note-dringlichkeit">
+          <option value="Dringend">Dringend</option>
+          <option value="Normal" selected>Normal</option>
+          <option value="Später">Später</option>
+        </select>
+      </div>
+    </div>
+    <label>Notiz</label>
+    <textarea id="note-summary" placeholder="Worum ging's, was ist zu tun?"></textarea>
+    <div style="display:flex;gap:8px;margin-top:12px;">
+      <button type="button" class="btn gold sm" id="saveNoteBtn">Speichern</button>
+      <button type="button" class="btn ghost sm" id="cancelNoteBtn">Abbrechen</button>
+    </div>
+  </div>`;
+}
+
+function renderDigestSection(){
+  if(!state.items.length){
+    return `
+    <div class="empty-hero">
+      <div class="emoji">🤖🍃</div>
+      <h3>Alice hat noch nichts zu zeigen</h3>
+      <p>Ihr erster Rundgang durch den Posteingang läuft täglich um 7:03 Uhr automatisch. Nicht warten wollen? Im Scheduled-Bereich auf "Jetzt ausführen" klicken. Telefon- oder Gesprächsnotizen kannst du jederzeit oben direkt hinzufügen.</p>
+    </div>`;
+  }
+  const active = itemsForTab(state.activeTab).filter(it=>it.status!=='erledigt' && !isSnoozed(it));
+  const erledigt = state.items.filter(it=>it.status==='erledigt');
+  const snoozed = state.items.filter(it=>isSnoozed(it));
+
+  let html = `<div class="section-title">Posteingang</div>${renderFolderTabs()}`;
+  html += active.length
+    ? active.map(it=>renderItemCard(it)).join('')
+    : `<div class="empty-state" style="padding:24px;">Nichts Offenes in diesem Fach. 🎉</div>`;
+
+  html += `<div class="toolbar-row">
+    ${snoozed.length ? `<button type="button" class="collapsible-toggle" id="toggleWiedervorlage">⏰ Wiedervorlage (${snoozed.length})${state.showWiedervorlage?' ▲':' ▼'}</button>` : '<span></span>'}
+    ${erledigt.length ? `<button type="button" class="collapsible-toggle" id="toggleErledigt">✓ Erledigt (${erledigt.length})${state.showErledigt?' ▲':' ▼'}</button>` : '<span></span>'}
+  </div>`;
+
+  if(state.showWiedervorlage && snoozed.length){
+    html += `<div class="section-title">In Wiedervorlage</div>${snoozed.map(it=>renderItemCard(it,{muted:true})).join('')}`;
+  }
+  if(state.showErledigt && erledigt.length){
+    html += `<div class="section-title">Erledigt</div>${erledigt.slice(0,30).map(it=>renderItemCard(it,{muted:true})).join('')}`;
+  }
+  return html;
+}
+
+function renderSuggestions(){
+  const relevant = state.suggestions.filter(s=>s.status!=='abgelehnt');
+  if(!relevant.length) return '';
+  return `
+    <div class="section-title">Termin-Vorschläge aus E-Mails</div>
+    ${relevant.map(s=>`
+      <div class="card suggestion-card">
+        <div class="card-head">
+          <div>
+            <div class="when">${escapeHtml(s.date||'?')}${s.startTime?(' · '+escapeHtml(s.startTime)):''}</div>
+            <p class="subject" style="margin-top:4px;">${escapeHtml(s.title||'Termin')}</p>
+            ${s.sourceSubject ? `<div class="sender">aus: ${escapeHtml(s.sourceSubject)}</div>` : ''}
+          </div>
+          <span class="status-pill ${s.status||'vorgeschlagen'}">${escapeHtml(s.status||'vorgeschlagen')}</span>
+        </div>
+        ${s.notes ? `<div class="snippet">${escapeHtml(s.notes)}</div>` : ''}
+        <div class="card-foot">
+          ${s.sourceThreadId ? `<a class="link-chip" href="${gmailThreadLink(s.sourceThreadId)}" target="_blank" rel="noopener">Mail ansehen ↗</a>` : '<span></span>'}
+          ${s.status==='vorgeschlagen' || s.status==='freigegeben' ? `
+            <div style="display:flex;gap:8px;">
+              ${s.status!=='freigegeben' ? `<button type="button" class="btn ok sm" data-approve="${s.id}">Freigeben</button>` : `<span class="draft-status">✓ freigegeben — wird beim nächsten Lauf angelegt</span>`}
+              <button type="button" class="btn ghost sm" data-reject="${s.id}">Ablehnen</button>
+            </div>` : ''}
+        </div>
+      </div>
+    `).join('')}
+  `;
+}
+
+function render(){
+  const el = document.getElementById('app');
+  if(!state.authUser){
+    el.innerHTML = renderLogin();
+    attachLoginHandlers();
+    return;
+  }
+  if(!state.loaded){
+    el.innerHTML = `${renderHeader()}<div class="app"><div class="empty-state"><span class="spinner"></span>Lädt…</div></div>`;
+    attachHeaderHandlers();
+    return;
+  }
+  el.innerHTML = `
+    ${renderHeader()}
+    <div class="app">
+      ${renderStatsRow()}
+      <div class="toolbar-row" style="margin-top:0;">
+        <span></span>
+        <button type="button" class="btn gold sm" id="openNoteBtn">📞 + Telefon-/Gesprächsnotiz</button>
+      </div>
+      ${renderNoteForm()}
+      ${renderSuggestions()}
+      ${renderDigestSection()}
+    </div>
+  `;
+  attachHeaderHandlers();
+  document.querySelectorAll('[data-approve]').forEach(b=>{ b.onclick = ()=>setSuggestionStatus(b.dataset.approve, 'freigegeben'); });
+  document.querySelectorAll('[data-reject]').forEach(b=>{ b.onclick = ()=>setSuggestionStatus(b.dataset.reject, 'abgelehnt'); });
+
+  document.querySelectorAll('[data-tab]').forEach(b=>{ b.onclick = ()=>{ state.activeTab = b.dataset.tab; render(); }; });
+  document.querySelectorAll('[data-done]').forEach(b=>{ b.onclick = ()=>setItemStatus(b.dataset.done, 'erledigt'); });
+  document.querySelectorAll('[data-reopen]').forEach(b=>{ b.onclick = ()=>setItemStatus(b.dataset.reopen, 'inbox'); });
+  document.querySelectorAll('[data-snooze]').forEach(b=>{ b.onclick = ()=>{ state.snoozeFormFor = b.dataset.snooze; render(); }; });
+  document.querySelectorAll('[data-clear-snooze]').forEach(b=>{ b.onclick = ()=>clearSnooze(b.dataset.clearSnooze); });
+  document.querySelectorAll('[data-confirm-snooze]').forEach(b=>{
+    b.onclick = ()=>{
+      const id = b.dataset.confirmSnooze;
+      const val = document.getElementById('snooze-date-'+id).value;
+      setSnooze(id, val);
+    };
+  });
+  document.querySelectorAll('[data-delete-note]').forEach(b=>{ b.onclick = ()=>deleteNote(b.dataset.deleteNote); });
+  const toggleW = document.getElementById('toggleWiedervorlage');
+  if(toggleW) toggleW.onclick = ()=>{ state.showWiedervorlage = !state.showWiedervorlage; render(); };
+  const toggleE = document.getElementById('toggleErledigt');
+  if(toggleE) toggleE.onclick = ()=>{ state.showErledigt = !state.showErledigt; render(); };
+  const openNoteBtn = document.getElementById('openNoteBtn');
+  if(openNoteBtn) openNoteBtn.onclick = ()=>{ state.noteFormOpen = true; render(); };
+  const cancelNoteBtn = document.getElementById('cancelNoteBtn');
+  if(cancelNoteBtn) cancelNoteBtn.onclick = ()=>{ state.noteFormOpen = false; render(); };
+  const saveNoteBtn = document.getElementById('saveNoteBtn');
+  if(saveNoteBtn) saveNoteBtn.onclick = ()=>{
+    createNote({
+      subject: document.getElementById('note-subject').value.trim(),
+      dringlichkeit: document.getElementById('note-dringlichkeit').value,
+      summary: document.getElementById('note-summary').value.trim()
+    });
+  };
+}
+function attachHeaderHandlers(){
+  const logoutBtn = document.getElementById('logoutBtn');
+  if(logoutBtn) logoutBtn.onclick = ()=>signOut(auth);
+}
+
+/* ============================= INIT ============================= */
+onAuthStateChanged(auth, (user)=>{
+  if(user){
+    state.authUser = user; state.authError = null; state.authBusy = false;
+    if(!state.loaded){ startSync(); }
+  } else {
+    state.authUser = null; state.loaded = false; stopSync();
+  }
+  render();
+});
+render();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw-alice.js').catch(()=>{}); });
+}
+</script>
+</body>
+</html>
