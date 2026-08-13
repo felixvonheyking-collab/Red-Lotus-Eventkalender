@@ -894,8 +894,11 @@ const NEBENKOSTEN_CHOICES = [null,750,650,550,0]; // null = automatisch nach Art
 
 /* Terminkategorien — jede mit eigener Farbe und eigenem Formular */
 const CATEGORY_ORDER = ['event','wochenmarkt','thymeandlime','festivalTL','sonstiges'];
-const CATEGORY_LABELS = {event:'Event', wochenmarkt:'Wochenmarkt', thymeandlime:'Thyme & Lime', festivalTL:'Festivals & Wochenmärkte (T&L)', sonstiges:'Sonstiges'};
-const CATEGORY_COLORS = {event:'#8f1d33', wochenmarkt:'#2e5e8f', thymeandlime:'#3d6b4a', festivalTL:'#6b8f3d', sonstiges:'#b5872e'};
+// "muell" bewusst NICHT in CATEGORY_ORDER — diese Termine entstehen nur über
+// den ICS-Import in den Einstellungen, nicht über die normale "Neuer
+// Termin"-Auswahl.
+const CATEGORY_LABELS = {event:'Event', wochenmarkt:'Wochenmarkt', thymeandlime:'Thyme & Lime', festivalTL:'Festivals & Wochenmärkte (T&L)', sonstiges:'Sonstiges', muell:'Müllabfuhr'};
+const CATEGORY_COLORS = {event:'#8f1d33', wochenmarkt:'#2e5e8f', thymeandlime:'#3d6b4a', festivalTL:'#6b8f3d', sonstiges:'#b5872e', muell:'#5a5651'};
 
 /* ============================= INVENTAR- & ABLAUFLISTE ============================= */
 // Kategorien der Inventar-Kernliste. Diese eine, zentral gepflegte Liste
@@ -2167,6 +2170,12 @@ function renderEinstellungenTab(){
     ${pushEnabled ? '<span style="margin-left:10px;font-size:12px;color:var(--gold-soft);">✓ aktiviert auf diesem Gerät</span>' : ''}
   </div>
   <div class="panel">
+    <h3>Müllabfuhr</h3>
+    <p class="hint" style="margin-bottom:12px;">Lade die Abfuhrtermine-Datei (.ics) von biberach.de/abfuhrkalender für eure Adresse hoch — sie erscheinen dann dezent als eigene Kategorie im Kalender. Erneutes Hochladen (z. B. nächstes Jahr) überschreibt vorhandene Termine, statt sie zu duplizieren.</p>
+    <label class="btn ghost sm" style="cursor:pointer;">ICS-Datei hochladen<input type="file" accept=".ics,text/calendar" id="muellIcsInput" style="display:none;"></label>
+    <span id="muellIcsStatus" class="hint" style="margin-left:10px;"></span>
+  </div>
+  <div class="panel">
     <h3>Datensicherung</h3>
     <p class="hint" style="margin-bottom:12px;">Alle Termine werden automatisch und in Echtzeit für dein ganzes Team gespeichert. Als zusätzliches Sicherheitsnetz kannst du hier jederzeit eine Backup-Datei herunterladen und bei Bedarf wieder einspielen.</p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
@@ -2642,6 +2651,66 @@ function attachGlobalHandlers(){
   if(expBtn) expBtn.onclick = exportBackup;
   const impInput = document.getElementById('importBackupInput');
   if(impInput) impInput.onchange = (ev)=>{ const f=ev.target.files[0]; if(f) importBackup(f); };
+
+  const muellInput = document.getElementById('muellIcsInput');
+  if(muellInput) muellInput.onchange = (ev)=>{ const f=ev.target.files[0]; if(f) importMuellIcs(f); ev.target.value=''; };
+}
+
+/* ============================= MÜLLABFUHR-ICS-IMPORT ============================= */
+// Einfacher, bewusst schlanker ICS-Parser — reicht für die Abfuhrkalender-
+// Dateien vom Landkreis (ganztägige VEVENT-Blöcke mit DTSTART;VALUE=DATE,
+// SUMMARY, UID). Keine externe Bibliothek nötig.
+function parseIcsEvents(text){
+  // Zeilenumbrüche innerhalb eines Feldes (ICS-Faltung: Folgezeile beginnt
+  // mit Leerzeichen/Tab) wieder zu einer Zeile zusammenfügen.
+  const unfolded = text.replace(/\r\n/g,'\n').replace(/\n[ \t]/g,'');
+  const blocks = unfolded.split('BEGIN:VEVENT').slice(1);
+  const events = [];
+  for(const raw of blocks){
+    const block = raw.split('END:VEVENT')[0];
+    const lines = block.split('\n').map(l=>l.trim()).filter(Boolean);
+    let dateStr=null, summary=null, uidVal=null;
+    for(const line of lines){
+      const idx = line.indexOf(':');
+      if(idx===-1) continue;
+      const keyPart = line.slice(0,idx); // z.B. "DTSTART;VALUE=DATE"
+      const value = line.slice(idx+1);
+      const key = keyPart.split(';')[0].toUpperCase();
+      if(key==='DTSTART'){
+        const m = value.match(/(\d{4})(\d{2})(\d{2})/);
+        if(m) dateStr = `${m[1]}-${m[2]}-${m[3]}`;
+      } else if(key==='SUMMARY'){
+        summary = value.replace(/\\,/g,',').replace(/\\;/g,';').trim();
+      } else if(key==='UID'){
+        uidVal = value.trim();
+      }
+    }
+    if(dateStr && uidVal) events.push({ date:dateStr, summary: summary||'Abholung', uid:uidVal });
+  }
+  return events;
+}
+async function importMuellIcs(file){
+  const statusEl = document.getElementById('muellIcsStatus');
+  if(statusEl) statusEl.textContent = 'Lese Datei…';
+  try{
+    const text = await file.text();
+    const events = parseIcsEvents(text);
+    if(!events.length){ throw new Error('Keine Termine in der Datei gefunden — ist es die richtige .ics-Datei?'); }
+    let count=0;
+    for(const ev of events){
+      const id = 'muell-'+ev.uid.replace(/[^a-zA-Z0-9]/g,'-').slice(0,120);
+      await setDoc(doc(db,'events',id), {
+        id, date: ev.date, category:'muell',
+        anlass: '🗑️ '+ev.summary
+      }, { merge:true });
+      count++;
+    }
+    if(statusEl) statusEl.textContent = `✓ ${count} Müllabfuhr-Termine übernommen.`;
+    showToast(`${count} Müllabfuhr-Termine übernommen.`, false);
+  }catch(e){
+    if(statusEl) statusEl.textContent = 'Fehler: '+(e.message||e);
+    showToast('Import fehlgeschlagen: '+(e.message||e), true);
+  }
 }
 
 function refreshDishSection(){
