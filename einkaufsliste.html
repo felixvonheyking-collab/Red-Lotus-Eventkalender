@@ -134,6 +134,17 @@ table.ing-table input,table.ing-table select{
 .overview-recipe ul{margin:0;padding-left:18px;font-size:13px;}
 .overview-recipe li{margin-bottom:2px;}
 
+/* Rezeptbuch (Zutaten + Zubereitung, lesbar & copy-fähig) */
+.book-card .book-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;}
+.book-card .zubereitung{white-space:pre-wrap;font-size:13.5px;line-height:1.6;}
+.book-card .no-steps{font-size:12.5px;color:var(--cream-dim);opacity:0.7;font-style:italic;}
+.field textarea{
+  width:100%;background:var(--ink-3);border:1px solid var(--line);color:var(--cream);
+  padding:9px 10px;border-radius:8px;font-size:14px;font-family:'Work Sans',sans-serif;
+  min-height:110px;resize:vertical;
+}
+.field textarea:focus{outline:none;border-color:var(--gold);}
+
 /* LOGIN */
 .login-wrap{display:flex;align-items:center;justify-content:center;min-height:90vh;padding:16px;}
 .login-card{
@@ -229,6 +240,14 @@ function startSync(){
 }
 function stopSync(){ if(unsubRecipes){ unsubRecipes(); unsubRecipes=null; } }
 
+async function copyToClipboard(text){
+  try{
+    await navigator.clipboard.writeText(text);
+    showToast('In die Zwischenablage kopiert.');
+  }catch(e){
+    showToast('Kopieren nicht möglich: '+(e.message||e), true);
+  }
+}
 function showToast(msg, isErr){
   state.toast = {msg, isErr};
   render();
@@ -348,6 +367,11 @@ function renderRecipeEditor(recipe){
     </div>
     <button type="button" class="btn ghost sm" id="addIngRowBtn" style="margin-top:8px;">+ Zutat hinzufügen</button>
     <div class="hint">„Vorrat" wird bei der automatischen Einkaufsmengen-Berechnung im Kalender nicht mitgezählt (z. B. Gewürze, die immer vorrätig sind). Der Faktor multipliziert die Menge zusätzlich (z. B. für Schwund/Reserve).</div>
+    <div class="field" style="margin-top:14px;">
+      <label>Zubereitung</label>
+      <textarea id="recipeZubereitungInput" placeholder="Schritt für Schritt, wie das Gericht zubereitet wird…">${escapeHtml(recipe.zubereitung||'')}</textarea>
+      <div class="hint">Erscheint zusammen mit den Zutaten im „Rezeptbuch" — für dich und dein Team, komplett unabhängig von der Einkaufsmengen-Berechnung.</div>
+    </div>
     <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
       <button type="button" class="btn gold" id="saveRecipeBtn">Speichern</button>
       <button type="button" class="btn ghost" id="duplicateRecipeBtn">Duplizieren</button>
@@ -405,6 +429,40 @@ function renderGanzesView(){
     return `<div class="card overview-recipe"><h3>${escapeHtml(r.name||'(ohne Namen)')}</h3>${catsHtml || '<div class="hint">Keine Zutaten hinterlegt.</div>'}</div>`;
   }).join('');
 }
+function recipeAsPlainText(r){
+  const lines = [`${r.name||'(ohne Namen)'}`, ''];
+  lines.push('Zutaten:');
+  (r.ingredients||[]).forEach(ing=>{
+    lines.push(`- ${ing.zutat}${ing.mengeProPerson?` — ${ing.mengeProPerson}${ing.einheit||''} / Person`:''}`);
+  });
+  if(r.zubereitung && r.zubereitung.trim()){
+    lines.push('', 'Zubereitung:', r.zubereitung.trim());
+  }
+  return lines.join('\n');
+}
+function renderRezeptbuchView(){
+  const list = recipesForBrand(state.activeBrand);
+  if(!list.length) return '<div class="empty-state">Noch keine Rezepturen für diese Marke angelegt.</div>';
+  return list.map(r=>{
+    const ingHtml = (r.ingredients||[]).length
+      ? `<ul>${(r.ingredients||[]).map(ing=>`<li>${escapeHtml(ing.zutat)}${ing.mengeProPerson?` — ${escapeHtml(ing.mengeProPerson)}${escapeHtml(ing.einheit||'')} / Person`:''}</li>`).join('')}</ul>`
+      : '<div class="hint">Keine Zutaten hinterlegt.</div>';
+    const zubereitungHtml = (r.zubereitung && r.zubereitung.trim())
+      ? `<div class="zubereitung">${escapeHtml(r.zubereitung.trim())}</div>`
+      : '<div class="no-steps">Noch keine Zubereitung hinterlegt — unter „Rezepturen bearbeiten" ergänzbar.</div>';
+    return `
+    <div class="card book-card" data-book-id="${r.id}">
+      <div class="book-head">
+        <div class="name" style="font-family:'Marcellus',serif;font-size:18px;">${escapeHtml(r.name||'(ohne Namen)')}</div>
+        <button type="button" class="btn ghost sm" data-copy-recipe="${r.id}">⧉ Kopieren</button>
+      </div>
+      <div class="cat-label">Zutaten (pro Person)</div>
+      ${ingHtml}
+      <div class="cat-label" style="margin-top:12px;">Zubereitung</div>
+      ${zubereitungHtml}
+    </div>`;
+  }).join('');
+}
 
 /* ============================= MAIN RENDER ============================= */
 function renderApp(){
@@ -434,10 +492,15 @@ function renderApp(){
       <div class="seg">
         <button type="button" data-set-view="liste" class="${state.viewMode==='liste'?'active':''}">Rezepturen bearbeiten</button>
         <button type="button" data-set-view="ganzes" class="${state.viewMode==='ganzes'?'active':''}">Rezepte im Ganzen</button>
+        <button type="button" data-set-view="buch" class="${state.viewMode==='buch'?'active':''}">📖 Rezeptbuch</button>
       </div>
     </div>
 
-    ${!state.loaded ? '<div class="empty-state">Lade Rezepturen…</div>' : (state.viewMode==='liste' ? renderListView() : renderGanzesView())}
+    ${!state.loaded ? '<div class="empty-state">Lade Rezepturen…</div>' : (
+      state.viewMode==='liste' ? renderListView() :
+      state.viewMode==='ganzes' ? renderGanzesView() :
+      renderRezeptbuchView()
+    )}
   </div>
   ${state.toast ? `<div class="toast ${state.toast.isErr?'err':''}">${escapeHtml(state.toast.msg)}</div>` : ''}
   `;
@@ -483,6 +546,13 @@ function attachAppHandlers(){
       render();
     };
   });
+  document.querySelectorAll('[data-copy-recipe]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const id = btn.getAttribute('data-copy-recipe');
+      const recipe = state.recipes[id];
+      if(recipe) copyToClipboard(recipeAsPlainText(recipe));
+    };
+  });
   document.querySelectorAll('[data-duplicate-recipe]').forEach(btn=>{
     btn.onclick = async (ev)=>{
       ev.stopPropagation();
@@ -516,11 +586,12 @@ function attachAppHandlers(){
     const brand = document.getElementById('recipeBrandInput').value;
     if(!name){ showToast('Bitte einen Namen eingeben.', true); return; }
     const ingredients = readIngredientRowsFromDom().filter(r=>r.zutat && r.zutat.trim());
+    const zubereitung = document.getElementById('recipeZubereitungInput').value;
     const isNew = state.openRecipeId==='__new__';
     const id = isNew ? uid() : state.openRecipeId;
     saveBtn.disabled = true; saveBtn.textContent = 'Speichert…';
     try{
-      await saveRecipe({ id, name, brand, ingredients });
+      await saveRecipe({ id, name, brand, ingredients, zubereitung });
       state.openRecipeId = null;
       state.editingIngredients = null;
       showToast('Rezeptur gespeichert.');

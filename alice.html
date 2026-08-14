@@ -155,7 +155,15 @@ a.link-chip:hover{color:#fff;}
   padding:8px 10px;border-radius:9px;font-size:13.5px;font-family:'Work Sans',sans-serif;
 }
 .note-form-card textarea{min-height:70px;resize:vertical;}
+.note-form-card .textarea-row{position:relative;}
+.mic-btn{
+  margin-top:6px;background:transparent;border:1px solid var(--line);color:var(--gold-soft);
+  padding:6px 12px;border-radius:20px;font-size:12px;cursor:pointer;font-family:'Work Sans',sans-serif;
+}
+.mic-btn.recording{background:var(--red);border-color:var(--red-bright);color:#fff;animation:pulse-rec 1.2s infinite;}
+@keyframes pulse-rec{0%,100%{opacity:1;}50%{opacity:0.6;}}
 .note-form-card label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:var(--gold-soft);margin-bottom:4px;opacity:0.85;}
+.note-form-card .cat-label{font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:var(--gold-soft);opacity:0.85;}
 .login-wrap{display:flex;align-items:center;justify-content:center;min-height:90vh;padding:20px;}
 .login-card{
   background:var(--ink-2);border:1px solid var(--line);border-radius:18px;
@@ -186,7 +194,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js';
 import {
   getFirestore, initializeFirestore, doc, collection, onSnapshot, updateDoc,
-  addDoc, deleteDoc, serverTimestamp
+  addDoc, deleteDoc, setDoc, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js';
 import {
   getMessaging, getToken, isSupported as isMessagingSupported
@@ -230,18 +238,23 @@ const googleProvider = new GoogleAuthProvider();
 const VAPID_KEY = "BA4mfX39KrU8pt-n5UL_DtUAZ-VUzgO0OBjO1X7a1GVhxs4--77d9PHXbhdLdKhZNMB4SQ4qyIKht0mNi5575hQ";
 const REGISTER_PUSH_URL = "https://us-central1-red-lotus-eventkalender.cloudfunctions.net/registerPushToken?key=rl_wix_h7k2m9p4";
 
-async function enablePushNotifications(){
+async function enablePushNotifications(silent){
   try{
-    if(!('serviceWorker' in navigator) || !('Notification' in window)){
-      alert('Push-Benachrichtigungen werden von diesem Browser nicht unterstützt.');
-      return;
-    }
+    if(!('serviceWorker' in navigator) || !('Notification' in window)) return;
     const supported = await isMessagingSupported().catch(()=>false);
     if(!supported){
-      alert('Push-Benachrichtigungen werden von diesem Browser/Gerät nicht unterstützt (z. B. iOS: App muss zum Home-Bildschirm hinzugefügt sein).');
+      if(!silent) alert('Push-Benachrichtigungen werden von diesem Browser/Gerät nicht unterstützt (z. B. iOS: App muss zum Home-Bildschirm hinzugefügt sein).');
       return;
     }
-    const permission = await Notification.requestPermission();
+    // Beim stillen Auto-Check (Seitenstart) nur weitermachen, wenn die
+    // Berechtigung schon erteilt ist — sonst würde requestPermission()
+    // theoretisch erneut einen Dialog zeigen können. Beim manuellen Klick
+    // (silent=false) wird ganz normal gefragt.
+    let permission = Notification.permission;
+    if(permission !== 'granted'){
+      if(silent) return;
+      permission = await Notification.requestPermission();
+    }
     if(permission !== 'granted'){
       alert('Berechtigung für Benachrichtigungen wurde nicht erteilt.');
       return;
@@ -250,7 +263,7 @@ async function enablePushNotifications(){
     const messaging = getMessaging(fbApp);
     const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
     if(!token){
-      alert('Kein Push-Token erhalten — bitte erneut versuchen.');
+      if(!silent) alert('Kein Push-Token erhalten — bitte erneut versuchen.');
       return;
     }
     await fetch(REGISTER_PUSH_URL, {
@@ -261,7 +274,7 @@ async function enablePushNotifications(){
     state.pushEnabled = true;
     render();
   }catch(e){
-    alert('Push-Benachrichtigungen konnten nicht aktiviert werden: '+(e.message||e));
+    if(!silent) alert('Push-Benachrichtigungen konnten nicht aktiviert werden: '+(e.message||e));
   }
 }
 
@@ -282,10 +295,47 @@ const state = {
   showWiedervorlage: false,
   snoozeFormFor: null, // itemId, für das gerade das Datumsfeld offen ist
   noteFormOpen: false,
-  pushEnabled: false
+  reportFormOpen: false,
+  reportStatus: '',
+  pushEnabled: false,
+  senderRules: {}, // email (lowercase) -> Label, z.B. "Lieferant Getränke"
+  labelFormFor: null, // itemId, für das gerade das Zuordnen-Feld offen ist
+  inventoryFormOpen: false,
+  inventoryCore: { items: [] } // settings/inventoryCore — geteilt mit dem Kalender
 };
 let unsubSuggestions = null;
 let unsubItems = null;
+let unsubSenderRules = null;
+let unsubInventoryCore = null;
+const INV_CATS = ['geraete','utensilien','verpackung','sonstiges','zutaten'];
+const INV_CAT_LABELS = { geraete:'Große Geräte', utensilien:'Küchenutensilien', verpackung:'Verpackungen', sonstiges:'Sonstiges', zutaten:'Zutaten' };
+async function copyToClipboard(text){
+  try{
+    await navigator.clipboard.writeText(text);
+    alert('In die Zwischenablage kopiert.');
+  }catch(e){
+    alert('Kopieren nicht möglich: '+(e.message||e));
+  }
+}
+function inventoryAsPlainText(){
+  const items = (state.inventoryCore && state.inventoryCore.items) || [];
+  const lines = ['Red Lotus — Inventarliste', ''];
+  INV_CATS.forEach(cat=>{
+    const catItems = items.filter(it=>it.category===cat);
+    if(!catItems.length) return;
+    lines.push(INV_CAT_LABELS[cat]+':');
+    catItems.forEach(it=>lines.push('- '+it.name));
+    lines.push('');
+  });
+  return lines.join('\n').trim();
+}
+function extractEmail(senderStr){
+  if(!senderStr) return '';
+  const m = senderStr.match(/<([^>]+)>/);
+  const raw = m ? m[1] : senderStr;
+  return raw.trim().toLowerCase();
+}
+function ruleIdFor(email){ return email.replace(/[^a-z0-9@.\-]/g,'_'); }
 const HERKUNFT_INFO = 'info@redlotus-asianfood.com';
 const HERKUNFT_REDLOTUS = 'redlotus.asianfood@gmail.com';
 
@@ -347,8 +397,21 @@ function mapAuthError(e){
 
 /* ============================= DATEN LADEN ============================= */
 function startSync(){
-  let itemsReady=false, suggestionsReady=false;
-  const maybeDone = ()=>{ if(itemsReady && suggestionsReady){ state.loaded=true; } render(); };
+  enablePushNotifications(true); // still nachziehen, falls Berechtigung von früher schon erteilt ist
+  let itemsReady=false, suggestionsReady=false, rulesReady=false;
+  const maybeDone = ()=>{ if(itemsReady && suggestionsReady && rulesReady){ state.loaded=true; } render(); };
+
+  unsubInventoryCore = onSnapshot(doc(db,'settings','inventoryCore'), (d)=>{
+    state.inventoryCore = d.exists() ? d.data() : { items: [] };
+    render();
+  }, (e)=>{ console.error('Inventar-Kernliste laden fehlgeschlagen', e); });
+
+  unsubSenderRules = onSnapshot(collection(db,'sender_rules'), (snap)=>{
+    const map = {};
+    snap.forEach(d=>{ const data=d.data(); if(data.senderEmail && data.label) map[data.senderEmail]=data.label; });
+    state.senderRules = map;
+    rulesReady = true; maybeDone();
+  }, (e)=>{ console.error('Absender-Regeln laden fehlgeschlagen', e); rulesReady=true; maybeDone(); });
 
   unsubItems = onSnapshot(collection(db,'secretary_items'), (snap)=>{
     const list = [];
@@ -375,7 +438,24 @@ function startSync(){
 function stopSync(){
   if(unsubSuggestions){ unsubSuggestions(); unsubSuggestions=null; }
   if(unsubItems){ unsubItems(); unsubItems=null; }
-  state.items = []; state.suggestions = [];
+  if(unsubSenderRules){ unsubSenderRules(); unsubSenderRules=null; }
+  if(unsubInventoryCore){ unsubInventoryCore(); unsubInventoryCore=null; }
+  state.items = []; state.suggestions = []; state.senderRules = {}; state.inventoryCore = { items: [] };
+}
+
+/* ---- Absender-Regeln (manuelle Zuordnung, z. B. Lieferanten, Versicherungen) ---- */
+async function setSenderLabel(email, label){
+  const trimmed = (label||'').trim();
+  try{
+    if(!trimmed){
+      await deleteDoc(doc(db,'sender_rules', ruleIdFor(email)));
+    } else {
+      await setDoc(doc(db,'sender_rules', ruleIdFor(email)), {
+        senderEmail: email, label: trimmed, updatedAt: serverTimestamp()
+      });
+    }
+    state.labelFormFor = null; render();
+  }catch(e){ alert('Zuordnung konnte nicht gespeichert werden: '+(e.message||e)); }
 }
 
 async function setSuggestionStatus(id, status){
@@ -398,6 +478,40 @@ async function setSnooze(id, dateStr){
 async function clearSnooze(id){
   try{ await updateDoc(doc(db,'secretary_items', id), { snoozeUntil: null, updatedAt: serverTimestamp() }); }
   catch(e){ alert('Konnte Wiedervorlage nicht aufheben: '+(e.message||e)); }
+}
+
+/* ---- Diktierfunktion (Web Speech API, läuft komplett im Browser) ---- */
+let speechRecognition = null;
+function toggleDictation(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){
+    alert('Diktieren wird von diesem Browser nicht unterstützt — am besten Chrome oder Edge nutzen.');
+    return;
+  }
+  const btn = document.getElementById('dictateBtn');
+  const textarea = document.getElementById('note-summary');
+  if(speechRecognition){ speechRecognition.stop(); return; }
+  const baseText = textarea.value ? textarea.value.replace(/\s+$/,'') + ' ' : '';
+  let finalText = '';
+  speechRecognition = new SR();
+  speechRecognition.lang = 'de-DE';
+  speechRecognition.continuous = true;
+  speechRecognition.interimResults = true;
+  speechRecognition.onresult = (ev)=>{
+    let interim = '';
+    for(let i=ev.resultIndex; i<ev.results.length; i++){
+      const t = ev.results[i][0].transcript;
+      if(ev.results[i].isFinal) finalText += t + ' '; else interim += t;
+    }
+    textarea.value = baseText + finalText + interim;
+  };
+  speechRecognition.onerror = (ev)=>{ console.error('Diktier-Fehler', ev.error); };
+  speechRecognition.onend = ()=>{
+    speechRecognition = null;
+    if(btn){ btn.textContent = '🎤 Diktieren'; btn.classList.remove('recording'); }
+  };
+  speechRecognition.start();
+  if(btn){ btn.textContent = '⏹️ Aufnahme stoppen'; btn.classList.add('recording'); }
 }
 
 /* ---- Telefon-/Gesprächsnotizen ---- */
@@ -432,6 +546,94 @@ async function deleteNote(id){
   catch(e){ alert('Konnte Notiz nicht löschen: '+(e.message||e)); }
 }
 
+/* ---- Beleg-Bericht als PDF (Vorbereitung für den Steuerberater) ---- */
+function currentQuarterRange(){
+  const now = new Date();
+  const q = Math.floor(now.getMonth()/3);
+  const start = new Date(now.getFullYear(), q*3, 1);
+  const end = new Date(now.getFullYear(), q*3+3, 0);
+  const fmt = (d)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  return { from: fmt(start), to: fmt(end) };
+}
+let html2pdfLoadPromise = null;
+function loadHtml2Pdf(){
+  if(window.html2pdf) return Promise.resolve();
+  if(html2pdfLoadPromise) return html2pdfLoadPromise;
+  html2pdfLoadPromise = new Promise((resolve,reject)=>{
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+    s.onload = resolve; s.onerror = ()=>reject(new Error('html2pdf.js konnte nicht geladen werden'));
+    document.head.appendChild(s);
+  });
+  return html2pdfLoadPromise;
+}
+function itemDateObj(it){
+  if(it.createdAt && typeof it.createdAt.toDate==='function') return it.createdAt.toDate();
+  return new Date(); // Fallback, falls der Server-Zeitstempel (noch) nicht vorliegt
+}
+async function generateBelegReport(fromStr, toStr){
+  state.reportStatus = 'PDF wird erstellt…'; render();
+  try{
+    await loadHtml2Pdf();
+    const from = new Date(fromStr+'T00:00:00');
+    const to = new Date(toStr+'T23:59:59');
+    const belege = state.items.filter(it=>{
+      if(!it.isBeleg) return false;
+      const d = itemDateObj(it);
+      return d>=from && d<=to;
+    });
+    if(!belege.length){
+      state.reportStatus = 'Keine Belege in diesem Zeitraum gefunden.'; render();
+      return;
+    }
+    const groups = {};
+    belege.forEach(it=>{
+      const key = labelForItem(it) || it.herkunft || 'Ohne Zuordnung';
+      (groups[key] = groups[key]||[]).push(it);
+    });
+    const groupKeys = Object.keys(groups).sort((a,b)=>a.localeCompare(b,'de'));
+    const rowsHtml = groupKeys.map(key=>`
+      <h3 style="font-family:'Marcellus',serif;font-size:15px;margin:18px 0 8px;color:#8f1d33;">${escapeHtml(key)} (${groups[key].length})</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:6px;">
+        <thead><tr style="background:#f0e9db;">
+          <th style="text-align:left;padding:5px 8px;border:1px solid #ccc;">Datum</th>
+          <th style="text-align:left;padding:5px 8px;border:1px solid #ccc;">Absender</th>
+          <th style="text-align:left;padding:5px 8px;border:1px solid #ccc;">Betreff</th>
+          <th style="text-align:left;padding:5px 8px;border:1px solid #ccc;">Notiz</th>
+        </tr></thead>
+        <tbody>
+          ${groups[key].map(it=>`
+            <tr>
+              <td style="padding:5px 8px;border:1px solid #ccc;white-space:nowrap;">${escapeHtml(itemDateObj(it).toLocaleDateString('de-DE'))}</td>
+              <td style="padding:5px 8px;border:1px solid #ccc;">${escapeHtml(it.sender||'')}</td>
+              <td style="padding:5px 8px;border:1px solid #ccc;">${escapeHtml(it.subject||'')}</td>
+              <td style="padding:5px 8px;border:1px solid #ccc;">${escapeHtml(it.summary||'')}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`).join('');
+    const container = document.createElement('div');
+    container.style.cssText = 'position:fixed;left:-9999px;top:0;width:190mm;background:#fff;color:#1c1b1a;padding:14mm;font-family:Arial,sans-serif;';
+    container.innerHTML = `
+      <h1 style="font-family:'Marcellus',serif;font-size:20px;margin:0 0 4px;">Red Lotus Asian Food — Beleg-Übersicht</h1>
+      <p style="font-size:12px;color:#555;margin:0 0 4px;">Zeitraum: ${escapeHtml(fromStr)} bis ${escapeHtml(toStr)} · erstellt am ${new Date().toLocaleDateString('de-DE')}</p>
+      <p style="font-size:11px;color:#888;margin:0 0 10px;">Automatische Vorsortierung durch Alice — bitte fachlich prüfen, ersetzt keine Buchhaltung.</p>
+      ${rowsHtml}
+    `;
+    document.body.appendChild(container);
+    await window.html2pdf().from(container).set({
+      margin: 0,
+      filename: `Red-Lotus-Belege_${fromStr}_bis_${toStr}.pdf`,
+      jsPDF: { unit:'mm', format:'a4', orientation:'portrait' }
+    }).save();
+    document.body.removeChild(container);
+    state.reportStatus = `✓ ${belege.length} Belege im PDF.`;
+    render();
+  }catch(e){
+    state.reportStatus = 'Fehler: '+(e.message||e);
+    render();
+  }
+}
+
 /* ============================= RENDER ============================= */
 function renderHeader(){
   return `
@@ -458,12 +660,18 @@ function badgeForDringlichkeit(d){
   return `<span class="badge ${cls}">${escapeHtml(d||'Normal')}</span>`;
 }
 function isSnoozed(it){ return it.snoozeUntil && it.snoozeUntil > todayISO(); }
+function labelForItem(it){
+  const email = extractEmail(it.sender);
+  return email ? state.senderRules[email] : null;
+}
 function itemsForTab(tab){
   return state.items.filter(it=>{
     if(tab==='alle') return true;
     if(tab==='info') return it.herkunft===HERKUNFT_INFO;
     if(tab==='redlotus') return it.herkunft===HERKUNFT_REDLOTUS;
     if(tab==='sonstige') return !it.herkunft || (it.herkunft!==HERKUNFT_INFO && it.herkunft!==HERKUNFT_REDLOTUS);
+    if(tab==='belege') return !!it.isBeleg;
+    if(tab.startsWith('label:')) return labelForItem(it)===tab.slice(6);
     return true;
   });
 }
@@ -490,19 +698,25 @@ function renderStatsRow(){
 }
 
 function renderFolderTabs(){
-  const counts = { alle:0, info:0, redlotus:0, sonstige:0 };
+  const counts = { alle:0, info:0, redlotus:0, sonstige:0, belege:0 };
+  const labelCounts = {};
   state.items.forEach(it=>{
     if(it.status==='erledigt' || isSnoozed(it)) return;
     counts.alle++;
     if(it.herkunft===HERKUNFT_INFO) counts.info++;
     else if(it.herkunft===HERKUNFT_REDLOTUS) counts.redlotus++;
     else counts.sonstige++;
+    if(it.isBeleg) counts.belege++;
+    const lbl = labelForItem(it);
+    if(lbl) labelCounts[lbl] = (labelCounts[lbl]||0)+1;
   });
   const tabs = [
-    ['alle','Alle'], ['info','info@…'], ['redlotus','redlotus.asianfood@…'], ['sonstige','Sonstiges']
+    ['alle','Alle'], ['info','info@…'], ['redlotus','redlotus.asianfood@…'], ['sonstige','Sonstiges'], ['belege','📄 Belege']
   ];
+  const labelTabs = Object.keys(labelCounts).sort((a,b)=>a.localeCompare(b,'de')).map(l=>['label:'+l, l]);
   return `<div class="folder-tabs">
     ${tabs.map(([key,label])=>`<button type="button" data-tab="${key}" class="${state.activeTab===key?'active':''}">${label}<span class="count">${counts[key]}</span></button>`).join('')}
+    ${labelTabs.map(([key,label])=>`<button type="button" data-tab="${key}" class="${state.activeTab===key?'active':''}">🏷️ ${escapeHtml(label)}<span class="count">${labelCounts[label]}</span></button>`).join('')}
   </div>`;
 }
 
@@ -519,6 +733,8 @@ function renderItemCard(it, opts){
           <div class="badges">
             ${badgeForDringlichkeit(it.dringlichkeit)}
             ${it.herkunft ? `<span class="badge herkunft">${escapeHtml(it.herkunft)}</span>` : ''}
+            ${!isNote && labelForItem(it) ? `<span class="badge herkunft">🏷️ ${escapeHtml(labelForItem(it))}</span>` : ''}
+            ${it.isBeleg ? `<span class="badge herkunft">📄 Beleg</span>` : ''}
           </div>
         </div>
         ${it.summary ? `<div class="snippet">${escapeHtml(it.summary)}</div>` : ''}
@@ -537,12 +753,20 @@ function renderItemCard(it, opts){
               ? `<button type="button" class="btn ghost sm" data-clear-snooze="${it.id}">Wiedervorlage aufheben</button>`
               : `<button type="button" class="btn ghost sm" data-snooze="${it.id}">⏰ Wiedervorlage</button>`}
           `}
+          ${!isNote && extractEmail(it.sender) ? `<button type="button" class="btn ghost sm" data-label="${it.id}">🏷️ Absender zuordnen</button>` : ''}
           ${isNote ? `<button type="button" class="btn ghost sm" data-delete-note="${it.id}">Löschen</button>` : ''}
         </div>
         ${state.snoozeFormFor===it.id ? `
           <div class="snooze-form">
             <input type="date" id="snooze-date-${it.id}" min="${todayISO()}" value="${isoDaysAgo(-3)}">
             <button type="button" class="btn gold sm" data-confirm-snooze="${it.id}">Auf Wiedervorlage legen</button>
+          </div>
+        ` : ''}
+        ${state.labelFormFor===it.id ? `
+          <div class="snooze-form">
+            <input type="text" id="label-text-${it.id}" placeholder="z. B. Lieferant Getränke, Versicherung" value="${escapeHtml(labelForItem(it)||'')}" style="flex:1;min-width:180px;background:var(--ink);border:1px solid var(--line);color:var(--cream);padding:7px 9px;border-radius:8px;font-size:13px;font-family:'Work Sans',sans-serif;">
+            <button type="button" class="btn gold sm" data-confirm-label="${it.id}">Speichern</button>
+            ${labelForItem(it) ? `<button type="button" class="btn ghost sm" data-clear-label="${it.id}">Entfernen</button>` : ''}
           </div>
         ` : ''}
       </div>`;
@@ -563,7 +787,10 @@ function renderNoteForm(){
       </div>
     </div>
     <label>Notiz</label>
-    <textarea id="note-summary" placeholder="Worum ging's, was ist zu tun?"></textarea>
+    <div class="textarea-row">
+      <textarea id="note-summary" placeholder="Worum ging's, was ist zu tun? Oder einfach diktieren."></textarea>
+      <div><button type="button" class="mic-btn" id="dictateBtn">🎤 Diktieren</button></div>
+    </div>
     <div style="margin-top:10px;">
       <label>Erinnerung (optional) ${state.pushEnabled ? '' : '— erst "Erinnerungen aktivieren" oben nötig, sonst kommt keine Benachrichtigung an'}</label>
       <input type="datetime-local" id="note-reminder">
@@ -571,6 +798,46 @@ function renderNoteForm(){
     <div style="display:flex;gap:8px;margin-top:12px;">
       <button type="button" class="btn gold sm" id="saveNoteBtn">Speichern</button>
       <button type="button" class="btn ghost sm" id="cancelNoteBtn">Abbrechen</button>
+    </div>
+  </div>`;
+}
+
+function renderReportForm(){
+  if(!state.reportFormOpen) return '';
+  const range = currentQuarterRange();
+  const belegCount = state.items.filter(it=>it.isBeleg).length;
+  return `
+  <div class="note-form-card">
+    <div class="field-row">
+      <div><label>Von</label><input type="date" id="report-from" value="${range.from}"></div>
+      <div><label>Bis</label><input type="date" id="report-to" value="${range.to}"></div>
+    </div>
+    <p style="font-size:12.5px;color:#6b6a67;margin:6px 0 0;">Insgesamt ${belegCount} als Beleg erkannte E-Mails im Postfach (alle Zeiträume). Alice sortiert automatisch nach Absender-Kategorie.</p>
+    <div style="display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap;">
+      <button type="button" class="btn gold sm" id="createReportBtn">📄 PDF erstellen</button>
+      <button type="button" class="btn ghost sm" id="cancelReportBtn">Abbrechen</button>
+      ${state.reportStatus ? `<span class="draft-status">${escapeHtml(state.reportStatus)}</span>` : ''}
+    </div>
+  </div>`;
+}
+
+function renderInventoryForm(){
+  if(!state.inventoryFormOpen) return '';
+  const items = (state.inventoryCore && state.inventoryCore.items) || [];
+  const catsHtml = INV_CATS.map(cat=>{
+    const catItems = items.filter(it=>it.category===cat);
+    if(!catItems.length) return '';
+    return `<div class="cat-label" style="margin-top:10px;">${INV_CAT_LABELS[cat]}</div><ul style="margin:4px 0 0;padding-left:18px;font-size:13px;">${catItems.map(it=>`<li>${escapeHtml(it.name)}</li>`).join('')}</ul>`;
+  }).join('');
+  return `
+  <div class="note-form-card">
+    <div class="field-row" style="align-items:center;">
+      <div class="name" style="font-family:'Marcellus',serif;font-size:16px;">Inventar-Kernliste</div>
+    </div>
+    ${items.length ? catsHtml : '<p class="hint">Noch keine Inventar-Kernliste hinterlegt — im Kalender unter Einstellungen anlegen.</p>'}
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
+      ${items.length ? `<button type="button" class="btn gold sm" id="copyInventoryBtn">⧉ In Zwischenablage kopieren</button>` : ''}
+      <button type="button" class="btn ghost sm" id="closeInventoryBtn">Schließen</button>
     </div>
   </div>`;
 }
@@ -657,8 +924,12 @@ function render(){
           ? `<span class="draft-status">🔔 Erinnerungen aktiv</span>`
           : `<button type="button" class="btn ghost sm" id="enablePushBtn">🔔 Erinnerungen aktivieren</button>`}
         <button type="button" class="btn gold sm" id="openNoteBtn">📞 + Telefon-/Gesprächsnotiz</button>
+        <button type="button" class="btn ghost sm" id="openReportBtn">📄 Beleg-Bericht (PDF)</button>
+        <button type="button" class="btn ghost sm" id="openInventoryBtn">📋 Inventarliste</button>
       </div>
       ${renderNoteForm()}
+      ${renderReportForm()}
+      ${renderInventoryForm()}
       ${renderSuggestions()}
       ${renderDigestSection()}
     </div>
@@ -680,6 +951,23 @@ function render(){
     };
   });
   document.querySelectorAll('[data-delete-note]').forEach(b=>{ b.onclick = ()=>deleteNote(b.dataset.deleteNote); });
+  document.querySelectorAll('[data-label]').forEach(b=>{ b.onclick = ()=>{ state.labelFormFor = b.dataset.label; render(); }; });
+  document.querySelectorAll('[data-clear-label]').forEach(b=>{
+    b.onclick = ()=>{
+      const it = state.items.find(x=>x.id===b.dataset.clearLabel);
+      const email = it ? extractEmail(it.sender) : '';
+      if(email) setSenderLabel(email, '');
+    };
+  });
+  document.querySelectorAll('[data-confirm-label]').forEach(b=>{
+    b.onclick = ()=>{
+      const id = b.dataset.confirmLabel;
+      const it = state.items.find(x=>x.id===id);
+      const email = it ? extractEmail(it.sender) : '';
+      const val = document.getElementById('label-text-'+id).value;
+      if(email) setSenderLabel(email, val);
+    };
+  });
   const toggleW = document.getElementById('toggleWiedervorlage');
   if(toggleW) toggleW.onclick = ()=>{ state.showWiedervorlage = !state.showWiedervorlage; render(); };
   const toggleE = document.getElementById('toggleErledigt');
@@ -688,6 +976,23 @@ function render(){
   if(openNoteBtn) openNoteBtn.onclick = ()=>{ state.noteFormOpen = true; render(); };
   const cancelNoteBtn = document.getElementById('cancelNoteBtn');
   if(cancelNoteBtn) cancelNoteBtn.onclick = ()=>{ state.noteFormOpen = false; render(); };
+  const openReportBtn = document.getElementById('openReportBtn');
+  if(openReportBtn) openReportBtn.onclick = ()=>{ state.reportFormOpen = true; state.reportStatus=''; render(); };
+  const cancelReportBtn = document.getElementById('cancelReportBtn');
+  if(cancelReportBtn) cancelReportBtn.onclick = ()=>{ state.reportFormOpen = false; state.reportStatus=''; render(); };
+  const createReportBtn = document.getElementById('createReportBtn');
+  if(createReportBtn) createReportBtn.onclick = ()=>{
+    const from = document.getElementById('report-from').value;
+    const to = document.getElementById('report-to').value;
+    if(!from || !to){ alert('Bitte Zeitraum wählen.'); return; }
+    generateBelegReport(from, to);
+  };
+  const openInventoryBtn = document.getElementById('openInventoryBtn');
+  if(openInventoryBtn) openInventoryBtn.onclick = ()=>{ state.inventoryFormOpen = true; render(); };
+  const closeInventoryBtn = document.getElementById('closeInventoryBtn');
+  if(closeInventoryBtn) closeInventoryBtn.onclick = ()=>{ state.inventoryFormOpen = false; render(); };
+  const copyInventoryBtn = document.getElementById('copyInventoryBtn');
+  if(copyInventoryBtn) copyInventoryBtn.onclick = ()=> copyToClipboard(inventoryAsPlainText());
   const saveNoteBtn = document.getElementById('saveNoteBtn');
   if(saveNoteBtn) saveNoteBtn.onclick = ()=>{
     createNote({
@@ -698,7 +1003,9 @@ function render(){
     });
   };
   const enablePushBtn = document.getElementById('enablePushBtn');
-  if(enablePushBtn) enablePushBtn.onclick = enablePushNotifications;
+  if(enablePushBtn) enablePushBtn.onclick = ()=>enablePushNotifications(false);
+  const dictateBtn = document.getElementById('dictateBtn');
+  if(dictateBtn) dictateBtn.onclick = toggleDictation;
 }
 function attachHeaderHandlers(){
   const logoutBtn = document.getElementById('logoutBtn');
