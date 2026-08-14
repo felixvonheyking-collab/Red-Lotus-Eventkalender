@@ -450,29 +450,36 @@ const googleProvider = new GoogleAuthProvider();
 // erzeugen -> den Schlüssel unten bei VAPID_KEY einsetzen.
 const VAPID_KEY = "BA4mfX39KrU8pt-n5UL_DtUAZ-VUzgO0OBjO1X7a1GVhxs4--77d9PHXbhdLdKhZNMB4SQ4qyIKht0mNi5575hQ";
 const REGISTER_PUSH_URL = "https://us-central1-red-lotus-eventkalender.cloudfunctions.net/registerPushToken?key=rl_wix_h7k2m9p4";
-let pushEnabled = false;
+// Merkt sich dauerhaft (pro Browser), ob Push schon einmal aktiviert wurde,
+// damit die UI nach einem Reload nicht wieder "nicht aktiviert" anzeigt und
+// man erneut klicken muss.
+const PUSH_ENABLED_FLAG = 'rl_push_enabled_v1';
+let pushEnabled = localStorage.getItem(PUSH_ENABLED_FLAG) === '1';
 
-async function enablePushNotifications(){
+async function enablePushNotifications(silent){
   try{
     if(!('serviceWorker' in navigator) || !('Notification' in window)){
-      showToast('Push-Benachrichtigungen werden von diesem Browser nicht unterstützt.', true);
+      if(!silent) showToast('Push-Benachrichtigungen werden von diesem Browser nicht unterstützt.', true);
       return;
     }
     const supported = await isMessagingSupported().catch(()=>false);
     if(!supported){
-      showToast('Push-Benachrichtigungen werden von diesem Browser/Gerät nicht unterstützt (z. B. iOS: App muss zum Home-Bildschirm hinzugefügt sein).', true);
+      if(!silent) showToast('Push-Benachrichtigungen werden von diesem Browser/Gerät nicht unterstützt (z. B. iOS: App muss zum Home-Bildschirm hinzugefügt sein).', true);
       return;
     }
-    const permission = await Notification.requestPermission();
+    // Im "silent"-Modus (automatischer Wiederherstellungsversuch beim Laden)
+    // keine neue Berechtigungsabfrage auslösen — nur wenn sie schon erteilt ist.
+    if(silent && Notification.permission !== 'granted') return;
+    const permission = silent ? Notification.permission : await Notification.requestPermission();
     if(permission !== 'granted'){
-      showToast('Berechtigung für Benachrichtigungen wurde nicht erteilt.', true);
+      if(!silent) showToast('Berechtigung für Benachrichtigungen wurde nicht erteilt.', true);
       return;
     }
     const reg = await navigator.serviceWorker.register('firebase-messaging-sw.js');
     const messaging = getMessaging(fbApp);
     const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
     if(!token){
-      showToast('Kein Push-Token erhalten — bitte erneut versuchen.', true);
+      if(!silent) showToast('Kein Push-Token erhalten — bitte erneut versuchen.', true);
       return;
     }
     await fetch(REGISTER_PUSH_URL, {
@@ -481,11 +488,12 @@ async function enablePushNotifications(){
       body: JSON.stringify({ token, email: (state.authUser && state.authUser.email) || '' })
     });
     pushEnabled = true;
-    showToast('Push-Benachrichtigungen aktiviert ✓', false);
+    try{ localStorage.setItem(PUSH_ENABLED_FLAG, '1'); }catch(e){}
+    if(!silent) showToast('Push-Benachrichtigungen aktiviert ✓', false);
     render();
   }catch(err){
     console.error('Fehler beim Aktivieren der Push-Benachrichtigungen:', err);
-    showToast('Push-Benachrichtigungen konnten nicht aktiviert werden: '+(err.message||err), true);
+    if(!silent) showToast('Push-Benachrichtigungen konnten nicht aktiviert werden: '+(err.message||err), true);
   }
 }
 
@@ -502,7 +510,29 @@ const GCAL_SCOPE = "https://www.googleapis.com/auth/calendar.events";
 const APP_BASE_URL = "https://felixvonheyking-collab.github.io/Event-Kalender-red-lotus/";
 
 let gcalTokenClient = null;
-let gcalAccessToken = null; // nur im Arbeitsspeicher, nie gespeichert — läuft nach ca. 1 Std. ab
+// Token wird zwischengespeichert (localStorage), damit man sich nicht bei jedem
+// Seitenwechsel/Reload neu mit Google Kalender verbinden muss. Läuft nach ca.
+// 1 Std. ab — wird dann automatisch im Hintergrund erneuert (siehe
+// autoRestoreGoogleConnections unten), solange die Google-Sitzung noch aktiv ist.
+const GCAL_TOKEN_STORAGE_KEY = 'rl_gcal_token_v1';
+const GCAL_CONNECTED_FLAG = 'rl_gcal_connected_v1';
+function saveGcalToken(accessToken, expiresInSec){
+  try{
+    const exp = Date.now() + Math.max(60, (expiresInSec||3600) - 120) * 1000; // 2 Min. Sicherheitspuffer
+    localStorage.setItem(GCAL_TOKEN_STORAGE_KEY, JSON.stringify({ token: accessToken, exp }));
+    localStorage.setItem(GCAL_CONNECTED_FLAG, '1');
+  }catch(e){}
+}
+function loadStoredGcalToken(){
+  try{
+    const raw = localStorage.getItem(GCAL_TOKEN_STORAGE_KEY);
+    if(!raw) return null;
+    const data = JSON.parse(raw);
+    if(data && data.token && data.exp && data.exp > Date.now()) return data.token;
+  }catch(e){}
+  return null;
+}
+let gcalAccessToken = loadStoredGcalToken();
 
 // html2pdf.js wird nur bei Bedarf nachgeladen (nicht bei jedem Kalender-
 // Aufruf) — erst wenn tatsächlich eine Rechnung als PDF verschickt wird.
@@ -544,11 +574,15 @@ function ensureGcalTokenClient(){
     callback: (resp)=>{
       if(resp && resp.access_token){
         gcalAccessToken = resp.access_token;
+        saveGcalToken(resp.access_token, resp.expires_in);
         showToast('Mit Google Kalender verbunden ✓', false);
         render();
-      } else {
+      } else if(resp && resp.error && resp.error !== 'interaction_required' && resp.error !== 'immediate_failed'){
         showToast('Google-Kalender-Verbindung fehlgeschlagen.', true);
       }
+      // Bei stillem Refresh (prompt:'') ohne aktive Sitzung kommt ein Fehler
+      // statt eines Tokens zurück — dann bleibt einfach der "Verbinden"-Button
+      // sichtbar, ohne störenden Toast.
     }
   });
 }
@@ -618,7 +652,32 @@ const GMAIL_INBOXES = [
   { id:'inbox2', label:'info@redlotus-asianfood.com' }
 ];
 let gmailTokenClients = {}; // inboxId -> tokenClient
-let gmailTokens = {};       // inboxId -> access_token (nur Arbeitsspeicher)
+// Tokens je Postfach in localStorage zwischenspeichern (gleiches Prinzip wie
+// beim Google-Kalender-Token oben), damit die Postfächer nicht bei jedem
+// Seitenwechsel neu verknüpft werden müssen.
+function gmailTokenStorageKey(inboxId){ return 'rl_gmail_token_v1_'+inboxId; }
+function gmailConnectedFlagKey(inboxId){ return 'rl_gmail_connected_v1_'+inboxId; }
+function saveGmailToken(inboxId, accessToken, expiresInSec){
+  try{
+    const exp = Date.now() + Math.max(60, (expiresInSec||3600) - 120) * 1000;
+    localStorage.setItem(gmailTokenStorageKey(inboxId), JSON.stringify({ token: accessToken, exp }));
+    localStorage.setItem(gmailConnectedFlagKey(inboxId), '1');
+  }catch(e){}
+}
+function loadStoredGmailToken(inboxId){
+  try{
+    const raw = localStorage.getItem(gmailTokenStorageKey(inboxId));
+    if(!raw) return null;
+    const data = JSON.parse(raw);
+    if(data && data.token && data.exp && data.exp > Date.now()) return data.token;
+  }catch(e){}
+  return null;
+}
+let gmailTokens = {};       // inboxId -> access_token (aus localStorage vorbefüllt, siehe unten)
+GMAIL_INBOXES.forEach(inbox=>{
+  const stored = loadStoredGmailToken(inbox.id);
+  if(stored) gmailTokens[inbox.id] = stored;
+});
 
 function ensureGmailTokenClient(inboxId){
   if(gmailTokenClients[inboxId] || typeof google === 'undefined' || !google.accounts) return;
@@ -628,9 +687,10 @@ function ensureGmailTokenClient(inboxId){
     callback: (resp)=>{
       if(resp && resp.access_token){
         gmailTokens[inboxId] = resp.access_token;
+        saveGmailToken(inboxId, resp.access_token, resp.expires_in);
         showToast('Postfach verbunden ✓', false);
         render();
-      } else {
+      } else if(resp && resp.error && resp.error !== 'interaction_required' && resp.error !== 'immediate_failed'){
         showToast('Postfach-Verbindung fehlgeschlagen.', true);
       }
     }
@@ -642,6 +702,27 @@ async function connectGmailInbox(inboxId){
   ensureGmailTokenClient(inboxId);
   if(!gmailTokenClients[inboxId]){ showToast('Bitte kurz warten und erneut versuchen.', true); return; }
   gmailTokenClients[inboxId].requestAccessToken();
+}
+
+// Stellt Google-Kalender- und Postfach-Verbindung beim Laden der Seite still
+// (ohne Klick/Popup) wieder her, sofern früher schon einmal verbunden wurde.
+// Läuft im Hintergrund; schlägt es fehl (z. B. Google-Sitzung im Browser
+// abgelaufen), bleibt einfach der normale "Verbinden"-Button als Fallback.
+let autoRestoreRanOnce = false;
+async function autoRestoreGoogleConnections(){
+  if(autoRestoreRanOnce) return;
+  autoRestoreRanOnce = true;
+  try{ await loadGisScript(); }catch(e){ return; }
+  if(!gcalAccessToken && localStorage.getItem(GCAL_CONNECTED_FLAG)==='1'){
+    ensureGcalTokenClient();
+    if(gcalTokenClient) gcalTokenClient.requestAccessToken({ prompt:'' });
+  }
+  GMAIL_INBOXES.forEach(inbox=>{
+    if(!gmailTokens[inbox.id] && localStorage.getItem(gmailConnectedFlagKey(inbox.id))==='1'){
+      ensureGmailTokenClient(inbox.id);
+      if(gmailTokenClients[inbox.id]) gmailTokenClients[inbox.id].requestAccessToken({ prompt:'' });
+    }
+  });
 }
 
 function decodeGmailBody(payload){
@@ -800,7 +881,10 @@ async function syncEventToGoogleCalendar(evt){
     }
     if(res.status === 401){
       gcalAccessToken = null;
-      showToast('Google-Kalender-Zugriff abgelaufen — bitte in den Einstellungen erneut verbinden.', true);
+      try{ localStorage.removeItem(GCAL_TOKEN_STORAGE_KEY); }catch(e){}
+      showToast('Google-Kalender-Zugriff abgelaufen — wird im Hintergrund erneuert, bitte gleich nochmal versuchen.', true);
+      autoRestoreRanOnce = false;
+      autoRestoreGoogleConnections();
       return;
     }
     if(!res.ok){
@@ -899,6 +983,10 @@ const CATEGORY_ORDER = ['event','wochenmarkt','thymeandlime','festivalTL','sonst
 // Termin"-Auswahl.
 const CATEGORY_LABELS = {event:'Event', wochenmarkt:'Wochenmarkt', thymeandlime:'Thyme & Lime', festivalTL:'Festivals & Wochenmärkte (T&L)', sonstiges:'Sonstiges', muell:'Müllabfuhr'};
 const CATEGORY_COLORS = {event:'#8f1d33', wochenmarkt:'#2e5e8f', thymeandlime:'#3d6b4a', festivalTL:'#6b8f3d', sonstiges:'#b5872e', muell:'#5a5651'};
+
+// Abo-Kalender-Link (Apple/Samsung/Google Kalender) — muss zum
+// ICS_FEED_SECRET in functions/index.js passen.
+const ICS_FEED_URL = 'https://us-central1-red-lotus-eventkalender.cloudfunctions.net/calendarFeed?key=rl_ics_p9k3wq7m2x';
 
 /* ============================= INVENTAR- & ABLAUFLISTE ============================= */
 // Kategorien der Inventar-Kernliste. Diese eine, zentral gepflegte Liste
@@ -1528,7 +1616,7 @@ function render(){
 
   app.innerHTML = `
     ${renderHeader()}
-    ${state.tab==='kalender' ? renderKalenderTab() : state.tab==='stundenzettel' ? renderStundenzettelTab() : renderEinstellungenTab()}
+    ${state.tab==='kalender' ? renderKalenderTab() : renderEinstellungenTab()}
   `;
   attachGlobalHandlers();
 
@@ -1561,7 +1649,6 @@ function renderHeader(){
     </div>
     <nav class="tabs">
       <button type="button" data-tab="kalender" class="${state.tab==='kalender'?'active':''}">Kalender</button>
-      <button type="button" data-tab="stundenzettel" class="${state.tab==='stundenzettel'?'active':''}">Stundenzettel</button>
       <button type="button" data-tab="einstellungen" class="${state.tab==='einstellungen'?'active':''}">Einstellungen</button>
       <a href="einkaufsliste.html" class="btn ghost" style="text-decoration:none;display:inline-flex;align-items:center;" title="Einkaufsliste">🛒</a>
       <a href="preisrechner.html" class="btn ghost" style="text-decoration:none;display:inline-flex;align-items:center;" title="Preisrechner">🧮</a>
@@ -1977,123 +2064,6 @@ function renderSelectedDishesTable(e){
   </div>`;
 }
 
-/* ============================= STUNDENZETTEL TAB ============================= */
-function computeStundenzettelRows(email, monthStr){
-  const eventRows = (state.events||[])
-    .filter(e => e.date && e.date.slice(0,7)===monthStr && e.teamHours && e.teamHours[email]>0)
-    .map(e => ({
-      id: null,
-      manual: false,
-      date: e.date,
-      dateFmt: e.date ? new Date(e.date+'T00:00:00').toLocaleDateString('de-DE') : '',
-      anlass: e.anlass || CATEGORY_LABELS[e.category] || 'Termin',
-      catLabel: CATEGORY_LABELS[e.category] || '',
-      hours: e.teamHours[email]
-    }));
-  const manualRows = (state.manualHours||[])
-    .filter(m => m.email===email && m.date && m.date.slice(0,7)===monthStr)
-    .map(m => ({
-      id: m.id,
-      manual: true,
-      date: m.date,
-      dateFmt: m.date ? new Date(m.date+'T00:00:00').toLocaleDateString('de-DE') : '',
-      anlass: m.label || 'Sonstige Arbeitszeit',
-      catLabel: 'Sonstiges',
-      hours: m.hours
-    }));
-  return [...eventRows, ...manualRows].sort((a,b)=> a.date.localeCompare(b.date));
-}
-function renderStundenzettelTab(){
-  if(!state.stz) state.stz = {
-    email: TEAM_MEMBERS[0].email,
-    month: new Date().toISOString().slice(0,7),
-    manualDate: new Date().toISOString().slice(0,10),
-    manualLabel: '',
-    manualHoursEntry: ''
-  };
-  const rows = computeStundenzettelRows(state.stz.email, state.stz.month);
-  const rate = (state.settings.stundenloehne && state.settings.stundenloehne[state.stz.email]) || 0;
-  const totalHours = rows.reduce((s,r)=>s+r.hours,0);
-  const totalAmount = totalHours*rate;
-  const memberName = (TEAM_MEMBERS.find(m=>m.email===state.stz.email)||{}).name || '';
-  return `
-  <div class="panel">
-    <h3>Stundenzettel</h3>
-    <p class="hint" style="margin-bottom:12px;">Zeigt alle Termine im gewählten Monat, bei denen für den Mitarbeiter Stunden eingetragen wurden (Feld „Std" bei der Team-Zuweisung im Termin), sowie manuell erfasste Arbeitszeit (z. B. Einkauf, Vorbereitung).</p>
-    <div class="field-row">
-      <div class="field"><label>Mitarbeiter</label>
-        <select id="stzMember">${TEAM_MEMBERS.map(m=>`<option value="${m.email}" ${state.stz.email===m.email?'selected':''}>${escapeHtml(m.name)}</option>`).join('')}</select>
-      </div>
-      <div class="field"><label>Monat</label><input type="month" id="stzMonth" value="${state.stz.month}"></div>
-    </div>
-    <div class="table-scroll">
-    <table class="dish-table">
-      <thead><tr><th>Datum</th><th>Termin</th><th>Kategorie</th><th>Stunden</th><th>Betrag</th><th></th></tr></thead>
-      <tbody>${rows.map(r=>`<tr><td>${r.dateFmt}</td><td>${escapeHtml(r.anlass)}</td><td>${escapeHtml(r.catLabel)}</td><td>${r.hours}</td><td>${fmtEUR(r.hours*rate)}</td><td>${r.manual ? `<button type="button" class="btn danger sm" data-del-manual-hours="${r.id}" title="Eintrag löschen">✕</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="6">Keine Stunden für diesen Monat erfasst.</td></tr>'}</tbody>
-      <tfoot><tr class="total-row"><td colspan="3">Summe</td><td>${totalHours}</td><td>${fmtEUR(totalAmount)}</td><td></td></tr></tfoot>
-    </table>
-    </div>
-
-    <div class="field-row" style="margin-top:10px;">
-      <div class="field"><label>Stundenlohn — ${escapeHtml(memberName)}</label>
-        <input type="number" min="0" step="0.10" id="stzRateInput" value="${rate || ''}" placeholder="€ / Std.">
-      </div>
-    </div>
-    ${rate ? '' : '<div class="hint" style="margin:-6px 0 10px;">Noch kein Stundenlohn hinterlegt.</div>'}
-
-    <div class="sub-title" style="margin-top:16px;">Arbeitszeit manuell eintragen</div>
-    <p class="hint" style="margin-bottom:8px;">Für Zeiten ohne Termin, z. B. Einkauf oder Vorbereitung.</p>
-    <div class="field-row3">
-      <div class="field"><label>Datum</label><input type="date" id="stzManualDate" value="${state.stz.manualDate}"></div>
-      <div class="field"><label>Beschreibung</label><input type="text" id="stzManualLabel" placeholder="z. B. Einkauf" value="${escapeHtml(state.stz.manualLabel)}"></div>
-      <div class="field"><label>Stunden</label><input type="number" min="0" step="0.25" id="stzManualHoursInput" placeholder="z. B. 2" value="${state.stz.manualHoursEntry}"></div>
-    </div>
-    <button type="button" class="btn ghost sm" id="stzAddManualBtn">+ Hinzufügen</button>
-
-    <div style="margin-top:18px;">
-      <button type="button" class="btn gold sm" id="stzPrintBtn">🖨️ Stundenzettel drucken</button>
-    </div>
-  </div>`;
-}
-function openStundenzettelPrint(email, monthStr){
-  const member = TEAM_MEMBERS.find(m=>m.email===email);
-  const rows = computeStundenzettelRows(email, monthStr);
-  const totalHours = rows.reduce((s,r)=>s+r.hours,0);
-  const logo = `<img src="${state.settings.logo || DEFAULT_LOGO}">`;
-  const monthLabel = new Date(monthStr+'-01').toLocaleDateString('de-DE', {month:'long', year:'numeric'});
-  // Bewusst OHNE Geldbeträge im Ausdruck — nur Stunden, siehe Wunsch:
-  // "Betrag" nur in der Bildschirmansicht, nicht auf dem unterschriebenen Zettel.
-  const rowsHtml = rows.map(r=>`<tr><td>${r.dateFmt}</td><td>${escapeHtml(r.anlass)}</td><td>${escapeHtml(r.catLabel)}</td><td style="text-align:right;">${r.hours}</td></tr>`).join('')
-    || '<tr><td colspan="4">Keine Stunden erfasst.</td></tr>';
-  const html = `
-    <div class="print-toolbar">
-      <button type="button" class="btn gold" onclick="window.print()">Drucken / Als PDF speichern</button>
-      <button type="button" class="btn ghost" onclick="document.getElementById('printArea').classList.remove('show')">Schließen</button>
-    </div>
-    <div class="print-body">
-      <div class="rl-print-header">
-        <div class="rl-print-logo">${logo}</div>
-        <div><h1>Red Lotus Asian Food</h1><div class="sub">Stundenzettel — ${monthLabel}</div></div>
-      </div>
-      <div class="print-meta-grid">
-        <div><b>Mitarbeiter:</b> ${escapeHtml(member?member.name:'')}</div>
-        <div><b>Zeitraum:</b> ${monthLabel}</div>
-      </div>
-      <table>
-        <thead><tr><th>Datum</th><th>Termin</th><th>Kategorie</th><th style="text-align:right;">Stunden</th></tr></thead>
-        <tbody>${rowsHtml}</tbody>
-        <tfoot><tr class="total-row"><td colspan="3">Summe</td><td style="text-align:right;">${totalHours}</td></tr></tfoot>
-      </table>
-      <div style="display:flex;gap:60px;margin-top:60px;">
-        <div style="flex:1;border-top:1px solid #999;padding-top:6px;font-size:12px;">Datum, Unterschrift Mitarbeiter</div>
-        <div style="flex:1;border-top:1px solid #999;padding-top:6px;font-size:12px;">Datum, Unterschrift Geschäftsführung</div>
-      </div>
-      <div class="print-footnote">Red Lotus Asian Food · Warthausen bei Biberach an der Riss · redlotus-asianfood.com</div>
-    </div>`;
-  const pa = document.getElementById('printArea');
-  pa.innerHTML = html;
-  pa.classList.add('show');
-}
 
 /* ============================= EINSTELLUNGEN TAB ============================= */
 function renderEinstellungenTab(){
@@ -2122,24 +2092,9 @@ function renderEinstellungenTab(){
       <a href="preisrechner.html" class="btn gold sm" style="text-decoration:none;display:inline-block;">🧮 Preisrechner öffnen</a>
       <a href="kuechendisplay.html" class="btn gold sm" style="text-decoration:none;display:inline-block;">🍳 Küchenbildschirm öffnen</a>
       <a href="kundendisplay.html" class="btn gold sm" style="text-decoration:none;display:inline-block;">🔔 Kundenanzeige öffnen</a>
+      <a href="loehne.html" class="btn gold sm" style="text-decoration:none;display:inline-block;">💰 Löhne öffnen</a>
+      <a href="alice.html" class="btn gold sm" style="text-decoration:none;display:inline-block;">🤖 Alice öffnen</a>
     </div>
-  </div>
-  <div class="panel">
-    <h3>Löhne</h3>
-    <p class="hint" style="margin-bottom:12px;">Stundenlohn je Mitarbeiter — wird für die automatische Betragsberechnung im Stundenzettel genutzt. Nur für dich als Geschäftsführung sichtbar, sonst niemanden.</p>
-    ${[
-      { id:'redlotus', label:'Red Lotus' },
-      { id:'limethyme', label:'Lime & Thyme' }
-    ].map(brand => `
-      <div class="sub-title" style="margin-top:${brand.id==='redlotus'?'0':'18px'};">${brand.id==='redlotus'?'🔴':'🟢'} ${brand.label}</div>
-      ${TEAM_MEMBERS.filter(m=>m.brand===brand.id).map(m=>`
-        <div class="lohn-row">
-          <label>${escapeHtml(m.name)}${m.fullName ? ` <span class="hint" style="margin:0;">(${escapeHtml(m.fullName)})</span>` : ''}</label>
-          <input type="number" min="0" step="0.10" data-lohn="${m.email}" value="${(state.settings.stundenloehne&&state.settings.stundenloehne[m.email])||''}" placeholder="€/Std">
-          <span class="hint" style="margin:0;">€ / Std.</span>
-        </div>
-      `).join('')}
-    `).join('')}
   </div>
   <div class="panel">
     <h3>Inventar-Kernliste</h3>
@@ -2168,6 +2123,16 @@ function renderEinstellungenTab(){
     <p class="hint" style="margin-bottom:12px;">Erhalte eine Benachrichtigung auf diesem Gerät bei neuen Wix-Buchungen und als Erinnerung an bevorstehende Termine. Auf dem iPhone funktioniert das nur, wenn die App zuvor über "Zum Home-Bildschirm hinzufügen" installiert wurde.</p>
     <button type="button" class="btn ghost sm" id="enablePushBtn">${pushEnabled ? 'Erneut aktivieren' : 'Push-Benachrichtigungen aktivieren'}</button>
     ${pushEnabled ? '<span style="margin-left:10px;font-size:12px;color:var(--gold-soft);">✓ aktiviert auf diesem Gerät</span>' : ''}
+  </div>
+  <div class="panel">
+    <h3>Kalender-Abo (iPhone / Samsung)</h3>
+    <p class="hint" style="margin-bottom:12px;">Alle Termine (Events, Wochenmärkte, Thyme & Lime, Festivals, Sonstiges, Müllabfuhr) automatisch im Handy-Kalender anzeigen — einmal einrichten, aktualisiert sich danach von selbst (meist alle paar Stunden). Läuft nur in eine Richtung: vom Red-Lotus-Kalender zum Handy, nicht umgekehrt.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+      <input type="text" readonly id="icsFeedUrlInput" value="${ICS_FEED_URL}" style="flex:1;min-width:220px;background:var(--panel-2,#1c1b1a);color:inherit;border:1px solid var(--line,#333);border-radius:8px;padding:8px 10px;font-size:12px;">
+      <button type="button" class="btn ghost sm" id="copyIcsFeedBtn">Link kopieren</button>
+    </div>
+    <p class="hint" style="margin-bottom:4px;"><b>iPhone (Apple Kalender):</b> Einstellungen → Kalender → Accounts → Account hinzufügen → Andere → Kalenderabo hinzufügen → Link einfügen.</p>
+    <p class="hint">Samsung (Google Kalender): Google Kalender App → Menü → Einstellungen → Kalender hinzufügen → Per URL → Link einfügen.</p>
   </div>
   <div class="panel">
     <h3>Müllabfuhr</h3>
@@ -2527,16 +2492,6 @@ function attachGlobalHandlers(){
     saveSettingsDoc(); render();
   };
 
-  document.querySelectorAll('[data-lohn]').forEach(inp=>{
-    inp.onchange = ()=>{
-      state.settings.stundenloehne = state.settings.stundenloehne || {};
-      const v = parseFloat(inp.value);
-      if(!isNaN(v) && v>=0) state.settings.stundenloehne[inp.dataset.lohn] = v;
-      else delete state.settings.stundenloehne[inp.dataset.lohn];
-      saveSettingsDoc();
-    };
-  });
-
   // Inventar-Kernliste verwalten (Einstellungen)
   document.querySelectorAll('[data-add-inv-core]').forEach(btn=>{
     btn.onclick = ()=>{
@@ -2568,72 +2523,6 @@ function attachGlobalHandlers(){
     };
   });
 
-  // Stundenzettel-Tab
-  const stzMember = document.getElementById('stzMember');
-  if(stzMember) stzMember.onchange = ()=>{ state.stz.email = stzMember.value; render(); };
-  const stzMonth = document.getElementById('stzMonth');
-  if(stzMonth) stzMonth.onchange = ()=>{ state.stz.month = stzMonth.value; render(); };
-  const stzPrintBtn = document.getElementById('stzPrintBtn');
-  if(stzPrintBtn) stzPrintBtn.onclick = ()=> openStundenzettelPrint(state.stz.email, state.stz.month);
-
-  // Stundenlohn direkt im Stundenzettel-Tab ändern (gleiche Ablage wie
-  // Einstellungen -> Löhne, nur bequemer während man den Zettel offen hat).
-  const stzRateInput = document.getElementById('stzRateInput');
-  if(stzRateInput) stzRateInput.onchange = ()=>{
-    state.settings.stundenloehne = state.settings.stundenloehne || {};
-    const v = parseFloat(stzRateInput.value);
-    if(!isNaN(v) && v>=0) state.settings.stundenloehne[state.stz.email] = v;
-    else delete state.settings.stundenloehne[state.stz.email];
-    saveSettingsDoc();
-    render();
-  };
-
-  const stzManualDate = document.getElementById('stzManualDate');
-  if(stzManualDate) stzManualDate.oninput = ()=>{ state.stz.manualDate = stzManualDate.value; };
-  const stzManualLabel = document.getElementById('stzManualLabel');
-  if(stzManualLabel) stzManualLabel.oninput = ()=>{ state.stz.manualLabel = stzManualLabel.value; };
-  const stzManualHoursInput = document.getElementById('stzManualHoursInput');
-  if(stzManualHoursInput) stzManualHoursInput.oninput = ()=>{ state.stz.manualHoursEntry = stzManualHoursInput.value; };
-
-  const stzAddManualBtn = document.getElementById('stzAddManualBtn');
-  if(stzAddManualBtn) stzAddManualBtn.onclick = async ()=>{
-    const hoursVal = parseFloat(state.stz.manualHoursEntry);
-    if(!state.stz.manualDate || isNaN(hoursVal) || hoursVal<=0){
-      showToast('Bitte Datum und eine gültige Stundenzahl eingeben.', true);
-      return;
-    }
-    const id = 'mh-' + Date.now() + '-' + Math.random().toString(36).slice(2,7);
-    const entry = {
-      id,
-      email: state.stz.email,
-      date: state.stz.manualDate,
-      label: (state.stz.manualLabel||'').trim() || 'Sonstige Arbeitszeit',
-      hours: hoursVal,
-      createdAt: new Date().toISOString()
-    };
-    try{
-      await setDoc(doc(db,'manualHours',id), entry);
-      state.stz.manualLabel = '';
-      state.stz.manualHoursEntry = '';
-      render();
-    }catch(e){
-      console.error('Konnte manuelle Arbeitszeit nicht speichern:', e);
-      showToast('Konnte nicht gespeichert werden.', true);
-    }
-  };
-
-  document.querySelectorAll('[data-del-manual-hours]').forEach(btn=>{
-    btn.onclick = async ()=>{
-      const id = btn.dataset.delManualHours;
-      if(!confirm('Diesen Arbeitszeit-Eintrag wirklich löschen?')) return;
-      try{
-        await deleteDoc(doc(db,'manualHours',id));
-      }catch(e){
-        console.error('Konnte manuelle Arbeitszeit nicht löschen:', e);
-        showToast('Konnte nicht gelöscht werden.', true);
-      }
-    };
-  });
   const rmLogo = document.getElementById('removeLogoBtn');
   if(rmLogo) rmLogo.onclick = ()=>{ state.settings.logo=null; saveSettingsDoc(); render(); };
 
@@ -3343,6 +3232,10 @@ onAuthStateChanged(auth, (user)=>{
     state.authError = null;
     state.authBusy = false;
     if(!state.loaded){ startFirestoreSync(); }
+    // Google-Kalender/Postfach-Verbindung und Push-Benachrichtigungen still
+    // wiederherstellen, statt dass Felix sich nach jedem Login neu verbinden muss.
+    autoRestoreGoogleConnections();
+    enablePushNotifications(true); // still nachziehen, falls Berechtigung von früher schon erteilt ist (wie in alice.html)
   } else {
     state.authUser = null;
     state.loaded = false;

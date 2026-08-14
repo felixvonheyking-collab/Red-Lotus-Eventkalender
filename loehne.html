@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Red Lotus · Löhne</title>
+<meta name="theme-color" content="#1c1b1a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Löhne">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#1c1b1a; --ink-2:#2a2726; --ink-3:#3a3634;
+  --red:#8f1d33; --red-deep:#6b1526; --red-bright:#b02942;
+  --gold:#c9a35e; --gold-soft:#e4cf9c; --cream:#f6efe2; --cream-dim:#e9ddc6;
+  --line:rgba(201,163,94,0.28); --ok:#5c8362; --warn:#c9793e;
+  --shadow:0 12px 32px rgba(0,0,0,0.35);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(143,29,51,0.25), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(201,163,94,0.12), transparent 55%),
+    var(--ink);
+  color:var(--cream);
+  font-family:'Work Sans',sans-serif;
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+.wordmark{font-family:'Marcellus',serif;letter-spacing:0.04em;}
+.app{max-width:900px;margin:0 auto;padding:20px 16px 80px;}
+header.top{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px;border-radius:16px;
+  background:linear-gradient(135deg, var(--ink-2), var(--ink-3));
+  border:1px solid var(--line);box-shadow:var(--shadow);
+  margin-bottom:18px;gap:12px;flex-wrap:wrap;
+}
+.brand{display:flex;align-items:center;gap:12px;}
+.brand-mark{
+  width:44px;height:44px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%, var(--red-bright), var(--red-deep) 70%);
+  border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;
+  font-family:'Marcellus',serif;color:var(--gold-soft);font-size:20px;flex-shrink:0;
+}
+.brand h1{font-size:19px;margin:0;font-weight:600;}
+.brand .sub{font-size:11.5px;color:var(--gold-soft);opacity:0.85;letter-spacing:0.08em;text-transform:uppercase;}
+nav.suite-nav{display:flex;gap:6px;flex-wrap:wrap;}
+nav.suite-nav a{
+  text-decoration:none;color:var(--cream);border:1px solid var(--line);
+  padding:7px 12px;border-radius:9px;font-size:12.5px;font-weight:600;white-space:nowrap;
+}
+nav.suite-nav a:hover{border-color:var(--gold);}
+nav.suite-nav a.active{background:var(--red);border-color:var(--red-bright);color:#fff;}
+button{font-family:'Work Sans',sans-serif;}
+.btn{
+  background:var(--red);color:#fff;border:none;padding:9px 14px;border-radius:9px;
+  cursor:pointer;font-size:13px;font-weight:600;letter-spacing:0.01em;transition:background .15s;
+}
+.btn:hover{background:var(--red-bright);}
+.btn.gold{background:var(--gold);color:var(--ink);}
+.btn.gold:hover{background:var(--gold-soft);}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--cream);}
+.btn.ghost:hover{border-color:var(--gold);}
+.btn.danger{background:transparent;border:1px solid var(--red);color:#e79aa7;}
+.btn.danger:hover{background:var(--red);color:#fff;}
+.btn.sm{padding:6px 10px;font-size:12px;border-radius:7px;}
+.btn:disabled{opacity:0.4;cursor:not-allowed;}
+.panel{
+  background:var(--ink-2);border:1px solid var(--line);border-radius:16px;
+  padding:20px;margin-top:18px;box-shadow:var(--shadow);
+}
+.panel h3{font-family:'Marcellus',serif;font-size:19px;margin:0 0 14px;font-weight:400;color:var(--gold-soft);}
+.hint{font-size:11.5px;color:var(--cream);opacity:0.55;margin-top:4px;}
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--gold-soft);margin-bottom:5px;opacity:0.9;}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.field-row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+@media (max-width:640px){.field-row,.field-row3{grid-template-columns:1fr;}}
+select,input[type=text],input[type=email],input[type=password],input[type=number],input[type=date],input[type=month]{
+  width:100%;background:var(--ink);border:1px solid var(--line);color:var(--cream);
+  padding:8px 10px;border-radius:9px;font-size:13.5px;font-family:'Work Sans',sans-serif;
+}
+input:focus,select:focus{outline:none;border-color:var(--gold);}
+.lohn-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.lohn-row label{width:110px;font-size:13px;color:var(--cream);flex-shrink:0;}
+.lohn-row input{width:110px;}
+.sub-title{font-size:12px;text-transform:uppercase;letter-spacing:0.05em;color:var(--gold-soft);margin:12px 0 8px;opacity:0.85;}
+.sub-title:first-child{margin-top:0;}
+.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:6px;}
+.table-scroll table.dish-table{margin-top:0;min-width:480px;}
+table.dish-table{width:100%;border-collapse:collapse;margin-top:6px;}
+table.dish-table th{
+  text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:0.05em;
+  color:var(--gold-soft);opacity:0.8;padding:6px 8px;border-bottom:1px solid var(--line);
+}
+table.dish-table td{padding:7px 8px;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.05);}
+.total-row td{font-weight:700;font-size:14px;padding-top:10px;color:var(--gold-soft);}
+.icon-btn{background:none;border:none;color:var(--gold-soft);opacity:0.6;cursor:pointer;font-size:13px;padding:2px 4px;}
+.icon-btn:hover{opacity:1;}
+#printArea{position:fixed;inset:0;background:#fff;z-index:9999;overflow:auto;padding:40px;display:none;}
+#printArea.show{display:block;}
+.rl-print-header{display:flex;align-items:center;gap:16px;border-bottom:3px solid #8f1d33;padding-bottom:14px;margin-bottom:20px;}
+.rl-print-logo{width:56px;height:56px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#b02942,#6b1526 70%);border:2px solid #c9a35e;flex-shrink:0;}
+.rl-print-logo img{width:100%;height:100%;border-radius:50%;object-fit:cover;}
+.rl-print-header h1{font-family:'Marcellus',serif;color:#6b1526;margin:0;font-size:22px;}
+.rl-print-header .sub{font-size:12px;color:#8f1d33;text-transform:uppercase;letter-spacing:0.08em;}
+.print-body{color:#1c1b1a;font-family:'Work Sans',sans-serif;max-width:800px;margin:0 auto;}
+.print-body table{width:100%;border-collapse:collapse;margin:14px 0;}
+.print-body th{background:#f6efe2;color:#6b1526;text-align:left;padding:8px 10px;font-size:11.5px;text-transform:uppercase;letter-spacing:0.04em;border-bottom:2px solid #c9a35e;}
+.print-body td{padding:8px 10px;border-bottom:1px solid #e9ddc6;font-size:13px;}
+.print-meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;margin-bottom:16px;font-size:13px;}
+.print-meta-grid div b{color:#6b1526;}
+.print-toolbar{display:flex;justify-content:flex-end;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+.print-footnote{font-size:11px;color:#7a746a;margin-top:24px;border-top:1px solid #e9ddc6;padding-top:10px;}
+@media print{
+  body *{visibility:hidden;}
+  #printArea, #printArea *{visibility:visible;}
+  #printArea{position:absolute;inset:0;padding:0;display:block !important;}
+  .print-toolbar{display:none !important;}
+  .app{display:none !important;}
+}
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:90vh;padding:20px;}
+.login-card{
+  background:var(--ink-2);border:1px solid var(--line);border-radius:18px;
+  padding:32px 28px;max-width:360px;width:100%;text-align:center;box-shadow:var(--shadow);
+}
+.login-card .sub{font-size:12px;color:var(--gold-soft);opacity:0.8;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:22px;}
+.login-error{background:rgba(130,33,17,0.3);border:1px solid #822111;color:#f2a78e;padding:9px 12px;border-radius:9px;font-size:12.5px;margin-bottom:14px;}
+.login-hint{font-size:11.5px;opacity:0.5;margin-top:14px;}
+.spinner{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;margin-right:6px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.empty-state{opacity:0.5;text-align:center;padding:24px 12px;font-size:13px;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="printArea"></div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js';
+import {
+  getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut,
+  GoogleAuthProvider, signInWithPopup
+} from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js';
+import {
+  getFirestore, initializeFirestore, doc, collection, onSnapshot,
+  setDoc, deleteDoc
+} from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js';
+
+function showFatalError(title, detail){
+  const el = document.getElementById('app');
+  if(!el) return;
+  el.innerHTML = `<div style="max-width:600px;margin:60px auto;padding:20px;background:#2a1116;border:1px solid #b02942;border-radius:14px;color:#f6efe2;font-family:sans-serif;">
+    <h2 style="color:#f2c9d1;margin-top:0;">${title}</h2>
+    <p style="font-size:13px;opacity:0.85;white-space:pre-wrap;word-break:break-word;">${(detail||'').toString().replace(/</g,'&lt;')}</p>
+    <p style="font-size:12px;opacity:0.6;">Bitte mach hiervon einen Screenshot.</p>
+  </div>`;
+}
+window.addEventListener('error', (ev)=>{ showFatalError('Es ist ein Fehler aufgetreten', (ev.message||'')+' ('+(ev.filename||'')+':'+(ev.lineno||'')+')'); });
+window.addEventListener('unhandledrejection', (ev)=>{ showFatalError('Es ist ein Fehler aufgetreten', ev.reason && ev.reason.message ? ev.reason.message : String(ev.reason)); });
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA0y6NWpF3N7241mA72Cj-gU_pvbqpNdD4",
+  authDomain: "red-lotus-eventkalender.firebaseapp.com",
+  projectId: "red-lotus-eventkalender",
+  storageBucket: "red-lotus-eventkalender.firebasestorage.app",
+  messagingSenderId: "864967561482",
+  appId: "1:864967561482:web:98ee51f304748e511f2af3"
+};
+const fbApp = initializeApp(firebaseConfig);
+const auth = getAuth(fbApp);
+const db = initializeFirestore(fbApp, { experimentalAutoDetectLongPolling: true }, "default");
+const googleProvider = new GoogleAuthProvider();
+
+const DEFAULT_LOGO = "logo-maneki.png";
+
+// Gleiche Team-Liste wie im Kalender (index.html) — bei Änderungen dort bitte
+// auch hier nachziehen, damit Mitarbeiter/Löhne konsistent bleiben.
+const TEAM_MEMBERS = [
+  { name:'Pearl', fullName:'Pimpaka von Heyking', email:'beepowpaw@gmail.com', brand:'redlotus' },
+  { name:'Felix', email:'felix.vonheyking@gmail.com', brand:'redlotus' },
+  { name:'Domi',  email:'kontakt@reka-restaurant.de', brand:'limethyme' },
+  { name:'Lukas', email:'lukas.laemmle@icloud.com', brand:'limethyme' },
+  { name:'Prang', fullName:'Teerada Hoffman', email:'prang.intern', internal:true, brand:'redlotus' },
+  { name:'Suki',  fullName:'Sukanya Banchuen', email:'suki.intern', internal:true, brand:'redlotus' }
+];
+const CATEGORY_LABELS = {
+  event:'Event', wochenmarkt:'Wochenmarkt', festival:'Festival',
+  thymeandlime:'Lime & Thyme', sonstiges:'Sonstiges', muell:'Müllabfuhr'
+};
+
+function escapeHtml(s){
+  return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function fmtEUR(n){ return (Number(n)||0).toLocaleString('de-DE',{style:'currency',currency:'EUR'}); }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+
+const state = {
+  authUser:null, authBusy:false, authError:null,
+  loaded:false,
+  events:[], manualHours:[], settings:{},
+  view:{
+    email: TEAM_MEMBERS[0].email,
+    month: new Date().toISOString().slice(0,7),
+    manualDate: todayISO(),
+    manualLabel:'',
+    manualHoursEntry:''
+  }
+};
+let unsubEvents=null, unsubManualHours=null, unsubSettings=null;
+
+/* ============================= LOGIN ============================= */
+function renderLogin(){
+  return `
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="brand-mark" style="margin:0 auto 10px;">💰</div>
+      <h1 class="wordmark">Löhne</h1>
+      <div class="sub">Red Lotus · Lohnabrechnung</div>
+      ${state.authError ? `<div class="login-error">${escapeHtml(state.authError)}</div>` : ''}
+      <button type="button" class="btn gold" id="googleLoginBtn" ${state.authBusy?'disabled':''} style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:16px;width:100%;">
+        <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.81.54-1.85.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.72A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.29-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.05l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.59-2.59C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>
+        ${state.authBusy?'Anmelden…':'Mit Google anmelden'}
+      </button>
+      <div style="display:flex;align-items:center;gap:10px;margin:14px 0;opacity:0.4;font-size:11px;">
+        <div style="flex:1;height:1px;background:var(--line);"></div>ODER<div style="flex:1;height:1px;background:var(--line);"></div>
+      </div>
+      <div class="field"><label>E-Mail</label><input type="email" id="login-email" autocomplete="username"></div>
+      <div class="field"><label>Passwort</label><input type="password" id="login-pass" autocomplete="current-password"></div>
+      <button type="button" class="btn ghost" id="loginBtn" ${state.authBusy?'disabled':''} style="width:100%;padding:11px;">${state.authBusy?'<span class="spinner"></span>Anmelden…':'Mit E-Mail anmelden'}</button>
+      <div class="login-hint">Gleicher Zugang wie im Red-Lotus-Eventkalender.</div>
+    </div>
+  </div>`;
+}
+function attachLoginHandlers(){
+  const doLogin = async ()=>{
+    const email = document.getElementById('login-email').value.trim();
+    const pass = document.getElementById('login-pass').value;
+    if(!email || !pass){ state.authError='Bitte E-Mail und Passwort eingeben.'; render(); return; }
+    state.authBusy=true; state.authError=null; render();
+    try{ await signInWithEmailAndPassword(auth, email, pass); }
+    catch(e){ state.authBusy=false; state.authError=mapAuthError(e); render(); }
+  };
+  const btn = document.getElementById('loginBtn');
+  if(btn) btn.onclick = doLogin;
+  ['login-email','login-pass'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.onkeydown = (ev)=>{ if(ev.key==='Enter') doLogin(); };
+  });
+  const googleBtn = document.getElementById('googleLoginBtn');
+  if(googleBtn) googleBtn.onclick = async ()=>{
+    state.authBusy=true; state.authError=null; render();
+    try{ await signInWithPopup(auth, googleProvider); }
+    catch(e){ state.authBusy=false; state.authError=mapAuthError(e); render(); }
+  };
+}
+function mapAuthError(e){
+  const code = e && e.code || '';
+  if(code.includes('invalid-credential') || code.includes('wrong-password') || code.includes('user-not-found')) return 'E-Mail oder Passwort ist falsch.';
+  if(code.includes('too-many-requests')) return 'Zu viele Versuche. Bitte kurz warten und erneut versuchen.';
+  if(code.includes('invalid-email')) return 'Diese E-Mail-Adresse ist ungültig.';
+  if(code.includes('popup-closed-by-user') || code.includes('cancelled-popup-request')) return 'Google-Anmeldung abgebrochen.';
+  if(code.includes('popup-blocked')) return 'Der Anmelde-Pop-up wurde blockiert. Bitte Pop-ups erlauben.';
+  if(code === 'permission-denied' || code.includes('permission-denied')) return 'Dieses Konto ist nicht freigeschaltet. Bitte bei Felix melden.';
+  return 'Anmeldung fehlgeschlagen: '+(e.message||e);
+}
+
+/* ============================= DATEN LADEN ============================= */
+function startSync(){
+  let eventsReady=false, hoursReady=false, settingsReady=false;
+  const maybeDone = ()=>{ if(eventsReady && hoursReady && settingsReady){ state.loaded=true; } render(); };
+
+  unsubEvents = onSnapshot(collection(db,'events'), snap=>{
+    state.events = snap.docs.map(d=>d.data());
+    eventsReady = true; maybeDone();
+  }, err=>{ console.error('Firestore-Fehler (events):', err); });
+
+  unsubManualHours = onSnapshot(collection(db,'manualHours'), snap=>{
+    state.manualHours = snap.docs.map(d=>d.data());
+    hoursReady = true; maybeDone();
+  }, err=>{ console.error('Firestore-Fehler (manualHours):', err); });
+
+  unsubSettings = onSnapshot(doc(db,'settings','main'), d=>{
+    state.settings = d.exists() ? d.data() : {};
+    settingsReady = true; maybeDone();
+  }, err=>{ console.error('Firestore-Fehler (settings):', err); });
+}
+function stopSync(){
+  if(unsubEvents) unsubEvents();
+  if(unsubManualHours) unsubManualHours();
+  if(unsubSettings) unsubSettings();
+}
+async function saveSettings(){
+  try{ await setDoc(doc(db,'settings','main'), state.settings); }
+  catch(e){ console.error('Löhne speichern fehlgeschlagen:', e); alert('Speichern fehlgeschlagen: '+(e.message||e)); }
+}
+
+/* ============================= BERECHNUNG ============================= */
+function computeRows(email, monthStr){
+  const eventRows = (state.events||[])
+    .filter(e => e.date && e.date.slice(0,7)===monthStr && e.teamHours && e.teamHours[email]>0)
+    .map(e => ({
+      id:null, manual:false, date:e.date,
+      dateFmt: e.date ? new Date(e.date+'T00:00:00').toLocaleDateString('de-DE') : '',
+      anlass: e.anlass || CATEGORY_LABELS[e.category] || 'Termin',
+      catLabel: CATEGORY_LABELS[e.category] || '',
+      hours: e.teamHours[email]
+    }));
+  const manualRows = (state.manualHours||[])
+    .filter(m => m.email===email && m.date && m.date.slice(0,7)===monthStr)
+    .map(m => ({
+      id:m.id, manual:true, date:m.date,
+      dateFmt: m.date ? new Date(m.date+'T00:00:00').toLocaleDateString('de-DE') : '',
+      anlass: m.label || 'Sonstige Arbeitszeit', catLabel:'Sonstiges', hours:m.hours
+    }));
+  return [...eventRows, ...manualRows].sort((a,b)=> a.date.localeCompare(b.date));
+}
+
+/* ============================= DRUCK ============================= */
+function openPrint(email, monthStr, withAmounts){
+  const member = TEAM_MEMBERS.find(m=>m.email===email);
+  const rows = computeRows(email, monthStr);
+  const rate = (state.settings.stundenloehne && state.settings.stundenloehne[email]) || 0;
+  const totalHours = rows.reduce((s,r)=>s+r.hours,0);
+  const totalAmount = totalHours*rate;
+  const logo = `<img src="${state.settings.logo || DEFAULT_LOGO}">`;
+  const monthLabel = new Date(monthStr+'-01').toLocaleDateString('de-DE', {month:'long', year:'numeric'});
+  const title = withAmounts ? 'Lohnzettel' : 'Stundenzettel';
+  const rowsHtml = rows.map(r=>`<tr><td>${r.dateFmt}</td><td>${escapeHtml(r.anlass)}</td><td>${escapeHtml(r.catLabel)}</td><td style="text-align:right;">${r.hours}</td>${withAmounts?`<td style="text-align:right;">${fmtEUR(r.hours*rate)}</td>`:''}</tr>`).join('')
+    || `<tr><td colspan="${withAmounts?5:4}">Keine Stunden erfasst.</td></tr>`;
+  const html = `
+    <div class="print-toolbar">
+      <button type="button" class="btn gold" onclick="window.print()">Drucken / Als PDF speichern</button>
+      <button type="button" class="btn ghost" onclick="document.getElementById('printArea').classList.remove('show')">Schließen</button>
+    </div>
+    <div class="print-body">
+      <div class="rl-print-header">
+        <div class="rl-print-logo">${logo}</div>
+        <div><h1>Red Lotus Asian Food</h1><div class="sub">${title} — ${monthLabel}</div></div>
+      </div>
+      <div class="print-meta-grid">
+        <div><b>Mitarbeiter:</b> ${escapeHtml(member?member.name:'')}</div>
+        <div><b>Zeitraum:</b> ${monthLabel}</div>
+        ${withAmounts?`<div><b>Stundenlohn:</b> ${fmtEUR(rate)}</div>`:''}
+      </div>
+      <table>
+        <thead><tr><th>Datum</th><th>Termin</th><th>Kategorie</th><th style="text-align:right;">Stunden</th>${withAmounts?'<th style="text-align:right;">Betrag</th>':''}</tr></thead>
+        <tbody>${rowsHtml}</tbody>
+        <tfoot><tr class="total-row"><td colspan="3">Summe</td><td style="text-align:right;">${totalHours}</td>${withAmounts?`<td style="text-align:right;">${fmtEUR(totalAmount)}</td>`:''}</tr></tfoot>
+      </table>
+      <div style="display:flex;gap:60px;margin-top:60px;">
+        <div style="flex:1;border-top:1px solid #999;padding-top:6px;font-size:12px;">Datum, Unterschrift Mitarbeiter</div>
+        <div style="flex:1;border-top:1px solid #999;padding-top:6px;font-size:12px;">Datum, Unterschrift Geschäftsführung</div>
+      </div>
+      <div class="print-footnote">Red Lotus Asian Food · Warthausen bei Biberach an der Riss · redlotus-asianfood.com</div>
+    </div>`;
+  const pa = document.getElementById('printArea');
+  pa.innerHTML = html;
+  pa.classList.add('show');
+}
+
+/* ============================= RENDER ============================= */
+function renderHeader(){
+  return `
+  <header class="top">
+    <div class="brand">
+      <div class="brand-mark">💰</div>
+      <div>
+        <h1 class="wordmark">Löhne</h1>
+        <div class="sub">Lohnabrechnung</div>
+      </div>
+    </div>
+    <nav class="suite-nav">
+      <a href="index.html">📅 Kalender</a>
+      <a href="einkaufsliste.html">🛒 Einkauf</a>
+      <a href="preisrechner.html">🧮 Preisrechner</a>
+      <a href="alice.html">🤖 Alice</a>
+      <a class="active" href="loehne.html">💰 Löhne</a>
+      <a href="inventar.html">📦 Inventar</a>
+      <a href="ablaufplaene.html">📋 Ablaufpläne</a>
+    </nav>
+    <button type="button" class="btn ghost sm" id="logoutBtn">Abmelden</button>
+  </header>`;
+}
+function renderApp(){
+  if(!state.authUser) return renderLogin();
+  if(!state.loaded) return renderHeader()+`<div class="app"><p class="hint">Lade…</p></div>`;
+
+  const rows = computeRows(state.view.email, state.view.month);
+  const rate = (state.settings.stundenloehne && state.settings.stundenloehne[state.view.email]) || 0;
+  const totalHours = rows.reduce((s,r)=>s+r.hours,0);
+  const totalAmount = totalHours*rate;
+  const memberName = (TEAM_MEMBERS.find(m=>m.email===state.view.email)||{}).name || '';
+
+  return renderHeader()+`
+  <div class="app">
+    <div class="panel">
+      <h3>Stundensätze</h3>
+      <p class="hint" style="margin-bottom:12px;">Stundenlohn je Mitarbeiter — Grundlage für die Betragsberechnung unten. Nur für dich als Geschäftsführung sichtbar.</p>
+      ${[
+        { id:'redlotus', label:'Red Lotus' },
+        { id:'limethyme', label:'Lime & Thyme' }
+      ].map(brand => `
+        <div class="sub-title" style="margin-top:${brand.id==='redlotus'?'0':'18px'};">${brand.id==='redlotus'?'🔴':'🟢'} ${brand.label}</div>
+        ${TEAM_MEMBERS.filter(m=>m.brand===brand.id).map(m=>`
+          <div class="lohn-row">
+            <label>${escapeHtml(m.name)}${m.fullName ? ` <span class="hint" style="margin:0;">(${escapeHtml(m.fullName)})</span>` : ''}</label>
+            <input type="number" min="0" step="0.10" data-lohn="${m.email}" value="${(state.settings.stundenloehne&&state.settings.stundenloehne[m.email])||''}" placeholder="€/Std">
+            <span class="hint" style="margin:0;">€ / Std.</span>
+          </div>
+        `).join('')}
+      `).join('')}
+    </div>
+
+    <div class="panel">
+      <h3>Stunden & Lohn</h3>
+      <div class="field-row">
+        <div class="field"><label>Mitarbeiter</label>
+          <select id="viewMember">${TEAM_MEMBERS.map(m=>`<option value="${m.email}" ${state.view.email===m.email?'selected':''}>${escapeHtml(m.name)}</option>`).join('')}</select>
+        </div>
+        <div class="field"><label>Monat</label><input type="month" id="viewMonth" value="${state.view.month}"></div>
+      </div>
+      <div class="table-scroll">
+      <table class="dish-table">
+        <thead><tr><th>Datum</th><th>Termin</th><th>Kategorie</th><th>Stunden</th><th>Betrag</th><th></th></tr></thead>
+        <tbody>${rows.map(r=>`<tr><td>${r.dateFmt}</td><td>${escapeHtml(r.anlass)}</td><td>${escapeHtml(r.catLabel)}</td><td>${r.hours}</td><td>${fmtEUR(r.hours*rate)}</td><td>${r.manual ? `<button type="button" class="icon-btn" data-del-manual="${r.id}" title="Eintrag löschen">✕</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="empty-state">Keine Stunden für diesen Monat erfasst.</td></tr>'}</tbody>
+        <tfoot><tr class="total-row"><td colspan="3">Summe</td><td>${totalHours}</td><td>${fmtEUR(totalAmount)}</td><td></td></tr></tfoot>
+      </table>
+      </div>
+      ${rate ? '' : '<div class="hint" style="margin-top:8px;">Noch kein Stundenlohn für '+escapeHtml(memberName)+' hinterlegt (oben eintragen).</div>'}
+
+      <div class="sub-title" style="margin-top:18px;">Arbeitszeit manuell eintragen</div>
+      <p class="hint" style="margin-bottom:8px;">Für Zeiten ohne Termin, z. B. Einkauf oder Vorbereitung.</p>
+      <div class="field-row3">
+        <div class="field"><label>Datum</label><input type="date" id="manualDate" value="${state.view.manualDate}"></div>
+        <div class="field"><label>Beschreibung</label><input type="text" id="manualLabel" placeholder="z. B. Einkauf" value="${escapeHtml(state.view.manualLabel)}"></div>
+        <div class="field"><label>Stunden</label><input type="number" min="0" step="0.25" id="manualHoursInput" placeholder="z. B. 2" value="${state.view.manualHoursEntry}"></div>
+      </div>
+      <button type="button" class="btn ghost sm" id="addManualBtn">+ Hinzufügen</button>
+
+      <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap;">
+        <button type="button" class="btn ghost sm" id="printHoursBtn">🖨️ Stundenzettel drucken (ohne Beträge, zum Unterschreiben)</button>
+        <button type="button" class="btn gold sm" id="printLohnBtn">🖨️ Lohnzettel drucken (mit Betrag)</button>
+      </div>
+    </div>
+  </div>`;
+}
+function render(){
+  document.getElementById('app').innerHTML = renderApp();
+  if(!state.authUser){ attachLoginHandlers(); return; }
+  attachHandlers();
+}
+function attachHandlers(){
+  const logoutBtn = document.getElementById('logoutBtn');
+  if(logoutBtn) logoutBtn.onclick = ()=>signOut(auth);
+
+  document.querySelectorAll('[data-lohn]').forEach(inp=>{
+    inp.onchange = ()=>{
+      state.settings.stundenloehne = state.settings.stundenloehne || {};
+      const v = parseFloat(inp.value);
+      if(!isNaN(v) && v>=0) state.settings.stundenloehne[inp.dataset.lohn] = v;
+      else delete state.settings.stundenloehne[inp.dataset.lohn];
+      saveSettings();
+      render();
+    };
+  });
+
+  const viewMember = document.getElementById('viewMember');
+  if(viewMember) viewMember.onchange = ()=>{ state.view.email = viewMember.value; render(); };
+  const viewMonth = document.getElementById('viewMonth');
+  if(viewMonth) viewMonth.onchange = ()=>{ state.view.month = viewMonth.value; render(); };
+
+  const manualDate = document.getElementById('manualDate');
+  if(manualDate) manualDate.oninput = ()=>{ state.view.manualDate = manualDate.value; };
+  const manualLabel = document.getElementById('manualLabel');
+  if(manualLabel) manualLabel.oninput = ()=>{ state.view.manualLabel = manualLabel.value; };
+  const manualHoursInput = document.getElementById('manualHoursInput');
+  if(manualHoursInput) manualHoursInput.oninput = ()=>{ state.view.manualHoursEntry = manualHoursInput.value; };
+
+  const addManualBtn = document.getElementById('addManualBtn');
+  if(addManualBtn) addManualBtn.onclick = async ()=>{
+    const hoursVal = parseFloat(state.view.manualHoursEntry);
+    if(!state.view.manualDate || isNaN(hoursVal) || hoursVal<=0){ alert('Bitte Datum und Stunden (> 0) angeben.'); return; }
+    const id = uid();
+    const entry = { id, email: state.view.email, date: state.view.manualDate, label: state.view.manualLabel.trim(), hours: hoursVal };
+    try{
+      await setDoc(doc(db,'manualHours',id), entry);
+      state.view.manualLabel = '';
+      state.view.manualHoursEntry = '';
+      render();
+    }catch(e){ console.error('Eintrag konnte nicht gespeichert werden:', e); alert('Speichern fehlgeschlagen: '+(e.message||e)); }
+  };
+  document.querySelectorAll('[data-del-manual]').forEach(b=>{
+    b.onclick = async ()=>{
+      if(!confirm('Diesen Eintrag wirklich löschen?')) return;
+      try{ await deleteDoc(doc(db,'manualHours',b.dataset.delManual)); }
+      catch(e){ console.error('Löschen fehlgeschlagen:', e); alert('Löschen fehlgeschlagen: '+(e.message||e)); }
+    };
+  });
+
+  const printHoursBtn = document.getElementById('printHoursBtn');
+  if(printHoursBtn) printHoursBtn.onclick = ()=> openPrint(state.view.email, state.view.month, false);
+  const printLohnBtn = document.getElementById('printLohnBtn');
+  if(printLohnBtn) printLohnBtn.onclick = ()=> openPrint(state.view.email, state.view.month, true);
+}
+
+/* ============================= INIT ============================= */
+onAuthStateChanged(auth, (user)=>{
+  if(user){
+    state.authUser = user; state.authError = null; state.authBusy = false;
+    if(!state.loaded){ startSync(); }
+  } else {
+    state.authUser = null; state.loaded = false; stopSync();
+  }
+  render();
+});
+render();
+</script>
+</body>
+</html>
