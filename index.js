@@ -864,3 +864,117 @@ exports.secretaryApi = onRequest({ cors: true }, async (req, res) => {
     res.status(500).json({ error: e.message || String(e) });
   }
 });
+
+/* ============================================================
+   Kalender-Abo-Feed (ICS)
+   ============================================================
+   Gibt alle Termine aus der "events"-Sammlung als ICS-Datei aus,
+   damit Apple Kalender (iPhone) und Google/Samsung Kalender sie
+   per "Kalender abonnieren" automatisch übernehmen und regelmäßig
+   selbst aktualisieren — ohne, dass jemand manuell etwas
+   exportieren/importieren muss.
+
+   Wichtig: Das ist eine EINBAHNSTRASSE. Termine fließen vom
+   Red-Lotus-Kalender zum Handy, nicht umgekehrt — Änderungen direkt
+   im Handy-Kalender haben keine Wirkung auf die Red-Lotus-App.
+
+   Sicherheit: Wie beim Wix-Webhook ein geheimer Schlüssel in der
+   URL (?key=...), da Apple/Google beim automatischen Abrufen des
+   Kalenders keine Logins/Header mitschicken können. Die URL ist
+   dadurch kein öffentlicher Link, den man erraten kann, aber auch
+   kein Hochsicherheits-Schutz — nur an vertraute Team-Mitglieder
+   weitergeben.
+   ============================================================ */
+
+const ICS_FEED_SECRET = "rl_ics_p9k3wq7m2x";
+const ICS_CATEGORY_LABELS = {
+  event: "Event",
+  wochenmarkt: "Wochenmarkt",
+  thymeandlime: "Thyme & Lime",
+  festivalTL: "Festival/Wochenmarkt (T&L)",
+  sonstiges: "Sonstiges",
+  muell: "Müllabfuhr"
+};
+
+function icsEscape(s){
+  return String(s || "")
+    .replace(/\\/g, "\\\\")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,")
+    .replace(/\n/g, "\\n");
+}
+// ICS verlangt Zeilen <= 75 Oktette, längere Zeilen müssen "gefaltet"
+// werden (Fortsetzung beginnt mit einem Leerzeichen).
+function icsFoldLine(line){
+  if(line.length <= 74) return line;
+  let out = line.slice(0, 74);
+  let rest = line.slice(74);
+  while(rest.length > 0){
+    out += "\r\n " + rest.slice(0, 73);
+    rest = rest.slice(73);
+  }
+  return out;
+}
+
+exports.calendarFeed = onRequest({ cors: true }, async (req, res) => {
+  const key = req.query.key;
+  if(key !== ICS_FEED_SECRET){
+    res.status(403).send("Forbidden — falscher oder fehlender Schlüssel");
+    return;
+  }
+  try{
+    const snap = await db.collection("events").get();
+    const now = new Date();
+    const dtstamp = now.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+
+    const lines = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//Red Lotus Asian Food//Kalender-Abo//DE",
+      "CALSCALE:GREGORIAN",
+      "METHOD:PUBLISH",
+      "X-WR-CALNAME:Red Lotus Asian Food",
+      "X-WR-TIMEZONE:Europe/Berlin",
+      "REFRESH-INTERVAL;VALUE=DURATION:PT4H",
+      "X-PUBLISHED-TTL:PT4H"
+    ];
+
+    snap.docs.forEach((d) => {
+      const evt = d.data();
+      if(!evt || !evt.date) return;
+      const dateCompact = String(evt.date).replace(/-/g, "");
+      if(!/^\d{8}$/.test(dateCompact)) return;
+      // Ende = Folgetag (ICS-Konvention für ganztägige Termine: DTEND ist exklusiv)
+      const d0 = new Date(evt.date + "T00:00:00Z");
+      const d1 = new Date(d0.getTime() + 24 * 3600 * 1000);
+      const dtend = d1.toISOString().slice(0, 10).replace(/-/g, "");
+
+      const catLabel = ICS_CATEGORY_LABELS[evt.category] || "";
+      const summary = evt.anlass || catLabel || "Red Lotus Termin";
+      const descParts = [];
+      if(catLabel) descParts.push("Kategorie: " + catLabel);
+      if(evt.people) descParts.push("Personen: " + evt.people);
+      if(evt.contactName) descParts.push("Kontakt: " + evt.contactName);
+
+      lines.push("BEGIN:VEVENT");
+      lines.push(icsFoldLine("UID:" + d.id + "@redlotus-asianfood.com"));
+      lines.push("DTSTAMP:" + dtstamp);
+      lines.push("DTSTART;VALUE=DATE:" + dateCompact);
+      lines.push("DTEND;VALUE=DATE:" + dtend);
+      lines.push(icsFoldLine("SUMMARY:" + icsEscape(summary)));
+      if(evt.address) lines.push(icsFoldLine("LOCATION:" + icsEscape(evt.address)));
+      if(descParts.length) lines.push(icsFoldLine("DESCRIPTION:" + icsEscape(descParts.join("\n"))));
+      if(catLabel) lines.push(icsFoldLine("CATEGORIES:" + icsEscape(catLabel)));
+      lines.push("END:VEVENT");
+    });
+
+    lines.push("END:VCALENDAR");
+
+    res.set("Content-Type", "text/calendar; charset=utf-8");
+    res.set("Cache-Control", "public, max-age=3600");
+    res.status(200).send(lines.join("\r\n") + "\r\n");
+  }catch(e){
+    console.error("calendarFeed Fehler:", e);
+    res.status(500).send("Fehler beim Erzeugen des Kalender-Feeds: " + (e.message || String(e)));
+  }
+});
