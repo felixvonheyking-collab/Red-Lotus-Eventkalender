@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Red Lotus · Inventar &amp; Ablauf</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="RL Inventar">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1c1b1a">
+<link rel="manifest" href="manifest-inventarablauf.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#1c1b1a;
+  --ink-2:#2a2726;
+  --ink-3:#3a3634;
+  --red:#8f1d33;
+  --red-deep:#6b1526;
+  --red-bright:#b02942;
+  --gold:#c9a35e;
+  --gold-soft:#e4cf9c;
+  --cream:#f6efe2;
+  --cream-dim:#e9ddc6;
+  --line:rgba(201,163,94,0.28);
+  --ok:#5c8362;
+  --warn:#c9793e;
+  --shadow:0 12px 32px rgba(0,0,0,0.35);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(143,29,51,0.25), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(201,163,94,0.12), transparent 55%),
+    var(--ink);
+  color:var(--cream);
+  font-family:'Work Sans',sans-serif;
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+.wordmark{font-family:'Marcellus',serif;letter-spacing:0.04em;}
+.app{max-width:800px;margin:0 auto;padding:20px 16px 80px;}
+header.top{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px;border-radius:16px;
+  background:linear-gradient(135deg, var(--ink-2), var(--ink-3));
+  border:1px solid var(--line);
+  box-shadow:var(--shadow);
+  margin-bottom:18px;gap:12px;flex-wrap:wrap;
+}
+.brand{display:flex;align-items:center;gap:12px;}
+.brand-mark{
+  width:44px;height:44px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%, var(--red-bright), var(--red-deep) 70%);
+  border:2px solid var(--gold);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Marcellus',serif;color:var(--gold-soft);font-size:20px;flex-shrink:0;
+}
+.brand h1{font-size:19px;margin:0;font-weight:600;}
+.brand .sub{font-size:11.5px;color:var(--gold-soft);opacity:0.85;letter-spacing:0.08em;text-transform:uppercase;}
+.top-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.btn{
+  border:1px solid var(--line);background:var(--ink-2);color:var(--cream);
+  padding:9px 14px;border-radius:10px;font-size:13px;cursor:pointer;font-weight:500;
+  font-family:'Work Sans',sans-serif;transition:all .15s;
+}
+.btn:hover{border-color:var(--gold);}
+.btn.gold{background:linear-gradient(135deg, var(--gold), #a9813f);color:#241c0f;border-color:var(--gold);font-weight:600;}
+.btn.ghost{background:transparent;}
+.btn.sm{padding:6px 10px;font-size:12px;}
+.icon-btn{background:none;border:none;color:var(--gold-soft);opacity:0.6;cursor:pointer;font-size:13px;padding:2px 4px;}
+.icon-btn:hover{opacity:1;}
+
+.panel{
+  background:var(--ink-2);border:1px solid var(--line);border-radius:14px;
+  padding:16px 18px;margin-bottom:16px;box-shadow:var(--shadow);
+}
+.panel h3{font-family:'Marcellus',serif;font-size:17px;margin:0 0 4px;}
+.hint{font-size:11.5px;color:var(--cream-dim);opacity:0.75;margin-top:6px;line-height:1.5;}
+.empty-state{text-align:center;padding:40px 20px;color:var(--cream-dim);opacity:0.7;font-size:13.5px;}
+
+.event-picker{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:6px;}
+.event-picker select{
+  flex:1;min-width:220px;background:var(--ink-3);border:1px solid var(--line);color:var(--cream);
+  padding:10px 12px;border-radius:8px;font-size:14px;font-family:'Work Sans',sans-serif;
+}
+.event-meta{font-size:12px;color:var(--gold-soft);opacity:0.85;margin-top:6px;}
+.cat-pill{display:inline-block;font-size:10px;padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:0.04em;background:rgba(201,163,94,0.18);color:var(--gold-soft);margin-left:6px;}
+
+.cat-block{border:1px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:hidden;}
+.cat-title{
+  display:flex;align-items:center;justify-content:space-between;cursor:pointer;
+  padding:11px 14px;background:var(--ink-2);font-size:13.5px;font-weight:600;
+}
+.cat-title .tag{font-size:11px;color:var(--gold-soft);opacity:0.7;font-weight:400;}
+.cat-body{padding:12px 14px;display:none;background:var(--ink-3);}
+.cat-body.open{display:block;}
+.check-item{display:flex;align-items:center;gap:10px;padding:7px 2px;border-bottom:1px dashed var(--line);}
+.check-item:last-child{border-bottom:none;}
+.check-item input[type=checkbox]{width:19px;height:19px;flex-shrink:0;accent-color:var(--gold);}
+.check-item .ci-label{flex:1;font-size:13.5px;}
+.check-item.done .ci-label{opacity:0.5;text-decoration:line-through;}
+.check-item .ci-core-tag{font-size:10.5px;color:var(--gold-soft);opacity:0.6;margin-left:6px;}
+.inv-add-row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
+.inv-add-row input[type=text]{
+  flex:1;min-width:140px;background:var(--ink-3);border:1px solid var(--line);color:var(--cream);
+  padding:8px 10px;border-radius:8px;font-size:13px;font-family:'Work Sans',sans-serif;
+}
+.ablauf-row{display:flex;align-items:center;gap:6px;padding:7px 4px;border-bottom:1px dashed var(--line);}
+.ablauf-row:last-child{border-bottom:none;}
+.ablauf-row input[type=checkbox]{width:19px;height:19px;flex-shrink:0;accent-color:var(--gold);}
+.ablauf-row .ar-text{flex:1;background:transparent;border:none;color:var(--cream);font-size:13.5px;padding:4px 2px;font-family:'Work Sans',sans-serif;}
+.ablauf-row.done .ar-text{opacity:0.5;text-decoration:line-through;}
+.ablauf-row .ar-move{background:none;border:none;color:var(--gold-soft);opacity:0.6;cursor:pointer;font-size:13px;padding:2px 5px;}
+.ablauf-row .ar-move:disabled{opacity:0.2;cursor:default;}
+
+/* LOGIN */
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:90vh;padding:16px;}
+.login-card{
+  background:var(--ink-2);border:1px solid var(--line);border-radius:18px;padding:28px 24px;
+  max-width:360px;width:100%;text-align:center;box-shadow:var(--shadow);
+}
+.login-card h1{margin:8px 0 2px;font-size:24px;}
+.login-card .sub{font-size:12px;color:var(--gold-soft);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:18px;}
+.field{margin-bottom:12px;text-align:left;}
+.field label{display:block;font-size:11.5px;color:var(--gold-soft);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:5px;}
+.field input{
+  width:100%;background:var(--ink-3);border:1px solid var(--line);color:var(--cream);
+  padding:9px 10px;border-radius:8px;font-size:14px;font-family:'Work Sans',sans-serif;
+}
+.field input:focus{outline:none;border-color:var(--gold);}
+.login-error{background:rgba(176,41,66,0.2);border:1px solid var(--red-bright);color:#f2c9d1;padding:9px 12px;border-radius:8px;font-size:12.5px;margin-bottom:14px;text-align:left;}
+.login-hint{font-size:11px;color:var(--cream-dim);opacity:0.7;margin-top:14px;line-height:1.5;}
+.spinner{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,0.35);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;margin-right:6px;vertical-align:-1px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink-3);border:1px solid var(--gold);color:var(--cream);padding:11px 18px;border-radius:10px;font-size:13px;box-shadow:var(--shadow);z-index:999;max-width:90vw;}
+.toast.err{border-color:var(--red-bright);color:#f2c9d1;}
+
+@media print{
+  .no-print{display:none !important;}
+  body{background:#fff;color:#000;}
+  .panel{box-shadow:none;border:1px solid #ccc;}
+}
+@media (max-width:600px){
+  .app{padding:12px 8px 70px;}
+  header.top{padding:10px 12px;}
+  .brand h1{font-size:16px;}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js';
+import {
+  getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut,
+  GoogleAuthProvider, signInWithPopup
+} from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js';
+import {
+  getFirestore, initializeFirestore, collection, doc, onSnapshot, updateDoc
+} from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js';
+
+function showFatalError(title, detail){
+  const el = document.getElementById('app');
+  if(!el) return;
+  el.innerHTML = `<div style="max-width:600px;margin:60px auto;padding:20px;background:#2a1116;border:1px solid #b02942;border-radius:14px;color:#f6efe2;font-family:sans-serif;">
+    <h2 style="color:#f2c9d1;margin-top:0;">${title}</h2>
+    <p style="font-size:13px;opacity:0.85;white-space:pre-wrap;word-break:break-word;">${(detail||'').toString().replace(/</g,'&lt;')}</p>
+    <p style="font-size:12px;opacity:0.6;">Bitte mach hiervon einen Screenshot.</p>
+  </div>`;
+}
+window.addEventListener('error', (ev)=>{ showFatalError('Es ist ein Fehler aufgetreten', (ev.message||'')+' ('+(ev.filename||'')+':'+(ev.lineno||'')+')'); });
+window.addEventListener('unhandledrejection', (ev)=>{ showFatalError('Es ist ein Fehler aufgetreten', ev.reason && ev.reason.message ? ev.reason.message : String(ev.reason)); });
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA0y6NWpF3N7241mA72Cj-gU_pvbqpNdD4",
+  authDomain: "red-lotus-eventkalender.firebaseapp.com",
+  projectId: "red-lotus-eventkalender",
+  storageBucket: "red-lotus-eventkalender.firebasestorage.app",
+  messagingSenderId: "864967561482",
+  appId: "1:864967561482:web:98ee51f304748e511f2af3"
+};
+const fbApp = initializeApp(firebaseConfig);
+const auth = getAuth(fbApp);
+const db = initializeFirestore(fbApp, { experimentalAutoDetectLongPolling: true }, "default");
+const googleProvider = new GoogleAuthProvider();
+
+/* ============================= KONSTANTEN ============================= */
+// Gleiche Kategorien/Beschriftungen wie im Kalender (index.html) — Inventar-
+// und Ablaufliste ergeben nur bei diesen Terminarten Sinn.
+const CATEGORY_LABELS = {event:'Event', wochenmarkt:'Wochenmarkt', thymeandlime:'Thyme & Lime', festivalTL:'Festivals & Wochenmärkte (T&L)'};
+const INV_ELIGIBLE_CATS = ['event','wochenmarkt','festivalTL','thymeandlime'];
+const INV_CATS = ['geraete','utensilien','verpackung','sonstiges','zutaten'];
+const INV_CAT_LABELS = { geraete:'Große Geräte', utensilien:'Küchenutensilien', verpackung:'Verpackungen', sonstiges:'Sonstiges', zutaten:'Zutaten' };
+
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function escapeHtml(s){ return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+
+/* ============================= STATE ============================= */
+const state = {
+  authUser:null, authError:null, authBusy:false, loaded:false,
+  events:{}, // id -> event
+  inventoryCore:{ items: [] },
+  selectedEventId:null,
+  openCats:{},
+  toast:null
+};
+let unsubEvents=null, unsubCore=null;
+
+function eligibleEvents(){
+  return Object.values(state.events).filter(e=>INV_ELIGIBLE_CATS.includes(e.category||'event')).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+}
+function pickDefaultEventId(){
+  const list = eligibleEvents();
+  if(!list.length) return null;
+  const today = todayISO();
+  const upcoming = list.filter(e=>e.date>=today);
+  if(upcoming.length) return upcoming[0].id; // nächster anstehender Termin
+  return list[list.length-1].id; // sonst zuletzt vergangener Termin
+}
+
+function startSync(){
+  let eventsReady=false, coreReady=false;
+  const maybeDone = ()=>{ if(eventsReady && coreReady){ state.loaded=true; if(!state.selectedEventId) state.selectedEventId = pickDefaultEventId(); } render(); };
+
+  unsubEvents = onSnapshot(collection(db,'events'), snap=>{
+    const map = {};
+    snap.forEach(d=>{ map[d.id] = { id:d.id, ...d.data() }; });
+    state.events = map;
+    // Falls der gerade gewählte Termin gelöscht wurde, oder noch keiner gewählt ist.
+    if(state.selectedEventId && !map[state.selectedEventId]) state.selectedEventId = null;
+    if(!state.selectedEventId && state.loaded) state.selectedEventId = pickDefaultEventId();
+    eventsReady = true; maybeDone();
+  }, err=>{ console.error('Firestore-Fehler (events):', err); showToast('Fehler beim Laden: '+err.message, true); });
+
+  unsubCore = onSnapshot(doc(db,'settings','inventoryCore'), d=>{
+    state.inventoryCore = d.exists() ? d.data() : { items: [] };
+    coreReady = true; maybeDone();
+  }, err=>{ console.error('Firestore-Fehler (inventoryCore):', err); coreReady=true; maybeDone(); });
+}
+function stopSync(){
+  if(unsubEvents){ unsubEvents(); unsubEvents=null; }
+  if(unsubCore){ unsubCore(); unsubCore=null; }
+  state.events = {}; state.selectedEventId = null;
+}
+
+function showToast(msg, isErr){
+  state.toast = {msg, isErr};
+  render();
+  setTimeout(()=>{ state.toast=null; render(); }, 3200);
+}
+
+/* ============================= INVENTAR/ABLAUF-LOGIK ============================= */
+// Gleiche Datenstruktur wie in index.html — beide Apps teilen sich dieselben
+// Firestore-Felder ("inventory"/"ablauf" auf dem Termin-Dokument), deshalb
+// bleiben Änderungen hier auch im Kalender sofort sichtbar (und umgekehrt).
+function seedInventoryItems(){
+  return (state.inventoryCore.items||[]).map(it=>({ id: uid(), category: it.category, name: it.name, checked:false, core:true }));
+}
+async function ensureInventory(evt){
+  if(evt.inventory && Array.isArray(evt.inventory.items)) return evt.inventory;
+  const inv = { items: seedInventoryItems(), seededAt: new Date().toISOString() };
+  await updateDoc(doc(db,'events', evt.id), { inventory: inv });
+  return inv;
+}
+async function toggleInvItem(evt, itemId){
+  const inv = await ensureInventory(evt);
+  const items = inv.items.map(it=> it.id===itemId ? {...it, checked:!it.checked} : it);
+  await updateDoc(doc(db,'events', evt.id), { inventory: {...inv, items} });
+}
+async function removeInvItem(evt, itemId){
+  const inv = await ensureInventory(evt);
+  const items = inv.items.filter(it=>it.id!==itemId);
+  await updateDoc(doc(db,'events', evt.id), { inventory: {...inv, items} });
+}
+async function addInvItem(evt, category, name){
+  if(!name || !name.trim()) return;
+  const inv = await ensureInventory(evt);
+  const items = [...inv.items, { id: uid(), category, name: name.trim(), checked:false, core:false }];
+  await updateDoc(doc(db,'events', evt.id), { inventory: {...inv, items} });
+}
+async function ensureAblauf(evt){
+  if(evt.ablauf && Array.isArray(evt.ablauf.items)) return evt.ablauf;
+  const abl = { items: [] };
+  await updateDoc(doc(db,'events', evt.id), { ablauf: abl });
+  return abl;
+}
+async function toggleAblaufItem(evt, itemId){
+  const abl = await ensureAblauf(evt);
+  const items = abl.items.map(it=> it.id===itemId ? {...it, checked:!it.checked} : it);
+  await updateDoc(doc(db,'events', evt.id), { ablauf: { items } });
+}
+async function removeAblaufItem(evt, itemId){
+  const abl = await ensureAblauf(evt);
+  const items = abl.items.filter(it=>it.id!==itemId);
+  await updateDoc(doc(db,'events', evt.id), { ablauf: { items } });
+}
+async function addAblaufItem(evt, text){
+  if(!text || !text.trim()) return;
+  const abl = await ensureAblauf(evt);
+  const items = [...abl.items, { id: uid(), text: text.trim(), checked:false }];
+  await updateDoc(doc(db,'events', evt.id), { ablauf: { items } });
+}
+async function moveAblaufItem(evt, itemId, dir){
+  const abl = await ensureAblauf(evt);
+  const items = [...abl.items];
+  const idx = items.findIndex(it=>it.id===itemId);
+  const swapWith = idx + dir;
+  if(idx<0 || swapWith<0 || swapWith>=items.length) return;
+  [items[idx], items[swapWith]] = [items[swapWith], items[idx]];
+  await updateDoc(doc(db,'events', evt.id), { ablauf: { items } });
+}
+
+/* ============================= LOGIN ============================= */
+function renderLogin(){
+  return `
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="brand-mark" style="margin:0 auto 10px;">📋</div>
+      <h1 class="wordmark">Red Lotus</h1>
+      <div class="sub">Inventar &amp; Ablauf</div>
+      ${state.authError ? `<div class="login-error">${escapeHtml(state.authError)}</div>` : ''}
+      <button type="button" class="btn gold" id="googleLoginBtn" ${state.authBusy?'disabled':''} style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:16px;width:100%;">
+        <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.81.54-1.85.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.72A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.29-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.05l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.59-2.59C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>
+        ${state.authBusy?'Anmelden…':'Mit Google anmelden'}
+      </button>
+      <div style="display:flex;align-items:center;gap:10px;margin:14px 0;opacity:0.4;font-size:11px;">
+        <div style="flex:1;height:1px;background:var(--line);"></div>ODER<div style="flex:1;height:1px;background:var(--line);"></div>
+      </div>
+      <div class="field"><label>E-Mail</label><input type="email" id="login-email" autocomplete="username"></div>
+      <div class="field"><label>Passwort</label><input type="password" id="login-pass" autocomplete="current-password"></div>
+      <button type="button" class="btn ghost" id="loginBtn" ${state.authBusy?'disabled':''} style="width:100%;padding:11px;">${state.authBusy?'<span class="spinner"></span>Anmelden…':'Mit E-Mail anmelden'}</button>
+      <div class="login-hint">Gleicher Zugang wie im Red-Lotus-Eventkalender.</div>
+    </div>
+  </div>`;
+}
+function attachLoginHandlers(){
+  const doLogin = async ()=>{
+    const email = document.getElementById('login-email').value.trim();
+    const pass = document.getElementById('login-pass').value;
+    if(!email || !pass){ state.authError='Bitte E-Mail und Passwort eingeben.'; render(); return; }
+    state.authBusy=true; state.authError=null; render();
+    try{ await signInWithEmailAndPassword(auth, email, pass); }
+    catch(e){ state.authBusy=false; state.authError=mapAuthError(e); render(); }
+  };
+  const btn = document.getElementById('loginBtn');
+  if(btn) btn.onclick = doLogin;
+  ['login-email','login-pass'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.onkeydown = (ev)=>{ if(ev.key==='Enter') doLogin(); };
+  });
+  const googleBtn = document.getElementById('googleLoginBtn');
+  if(googleBtn) googleBtn.onclick = async ()=>{
+    state.authBusy=true; state.authError=null; render();
+    try{ await signInWithPopup(auth, googleProvider); }
+    catch(e){ state.authBusy=false; state.authError=mapAuthError(e); render(); }
+  };
+}
+function mapAuthError(e){
+  const code = e && e.code || '';
+  if(code.includes('invalid-credential') || code.includes('wrong-password') || code.includes('user-not-found')) return 'E-Mail oder Passwort ist falsch.';
+  if(code.includes('too-many-requests')) return 'Zu viele Versuche. Bitte kurz warten und erneut versuchen.';
+  if(code.includes('invalid-email')) return 'Diese E-Mail-Adresse ist ungültig.';
+  if(code.includes('popup-closed-by-user') || code.includes('cancelled-popup-request')) return 'Google-Anmeldung abgebrochen.';
+  if(code.includes('popup-blocked')) return 'Der Anmelde-Pop-up wurde blockiert. Bitte Pop-ups erlauben.';
+  if(code === 'permission-denied' || code.includes('permission-denied')) return 'Dieses Konto ist nicht freigeschaltet. Bitte bei Felix melden.';
+  return 'Anmeldung fehlgeschlagen: '+(e.message||e);
+}
+
+/* ============================= RENDER ============================= */
+function renderEventPicker(){
+  const list = eligibleEvents();
+  const today = todayISO();
+  const upcoming = list.filter(e=>e.date>=today);
+  const past = list.filter(e=>e.date<today).reverse();
+  const optionsFor = (arr)=>arr.map(e=>`<option value="${e.id}" ${state.selectedEventId===e.id?'selected':''}>${e.date ? new Date(e.date+'T00:00:00').toLocaleDateString('de-DE') : '?'} · ${escapeHtml(e.anlass||'Termin')}</option>`).join('');
+  return `
+  <div class="panel no-print">
+    <h3>Termin</h3>
+    <div class="event-picker">
+      <select id="eventSelect">
+        ${!list.length ? '<option value="">Keine passenden Termine vorhanden</option>' : ''}
+        ${upcoming.length ? `<optgroup label="Anstehende Termine">${optionsFor(upcoming)}</optgroup>` : ''}
+        ${past.length ? `<optgroup label="Vergangene Termine">${optionsFor(past)}</optgroup>` : ''}
+      </select>
+      <button type="button" class="btn ghost sm" id="printBtn">🖨 Drucken</button>
+    </div>
+    <p class="hint">Zeigt automatisch den nächsten anstehenden Termin (Event, Wochenmarkt, Thyme & Lime, Festival). Müllabfuhr und Sonstiges-Termine haben keine Inventar-/Ablaufliste.</p>
+  </div>`;
+}
+function renderInventorySection(evt){
+  const items = (evt.inventory && evt.inventory.items) || [];
+  const doneCount = items.filter(it=>it.checked).length;
+  const blocks = INV_CATS.map(cat=>{
+    const catItems = items.filter(it=>it.category===cat);
+    const open = !!state.openCats['inv_'+cat];
+    return `
+    <div class="cat-block">
+      <div class="cat-title" data-toggle-cat="inv_${cat}">
+        <span>${INV_CAT_LABELS[cat]}</span>
+        <span class="tag">${open?'▲':'▼'} ${catItems.filter(it=>it.checked).length}/${catItems.length}</span>
+      </div>
+      <div class="cat-body ${open?'open':''}">
+        ${catItems.length ? catItems.map(it=>`
+          <div class="check-item ${it.checked?'done':''}">
+            <input type="checkbox" data-inv-check="${it.id}" ${it.checked?'checked':''}>
+            <span class="ci-label">${escapeHtml(it.name)}${it.core?'<span class="ci-core-tag">Kernliste</span>':''}</span>
+            <button type="button" class="icon-btn no-print" data-inv-remove="${it.id}" title="Entfernen">✕</button>
+          </div>`).join('') : '<div class="hint">Noch keine Punkte in dieser Kategorie.</div>'}
+        <div class="inv-add-row no-print">
+          <input type="text" data-inv-add-name="${cat}" placeholder="Neuer Punkt hinzufügen">
+          <button type="button" class="btn ghost sm" data-inv-add="${cat}">+ Hinzufügen</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  return `
+  <div class="panel">
+    <h3>Inventarliste <span style="opacity:.6;font-size:12px;font-weight:400;">${doneCount}/${items.length} abgehakt</span></h3>
+    ${blocks}
+  </div>`;
+}
+function renderAblaufSection(evt){
+  const items = (evt.ablauf && evt.ablauf.items) || [];
+  return `
+  <div class="panel">
+    <h3>Ablaufliste</h3>
+    ${items.length ? items.map((it,idx)=>`
+      <div class="ablauf-row ${it.checked?'done':''}">
+        <input type="checkbox" data-ablauf-check="${it.id}" ${it.checked?'checked':''}>
+        <span class="ar-text" style="flex:1;">${escapeHtml(it.text)}</span>
+        <button type="button" class="ar-move no-print" data-ablauf-up="${it.id}" title="Nach oben" ${idx===0?'disabled':''}>↑</button>
+        <button type="button" class="ar-move no-print" data-ablauf-down="${it.id}" title="Nach unten" ${idx===items.length-1?'disabled':''}>↓</button>
+        <button type="button" class="icon-btn no-print" data-ablauf-remove="${it.id}" title="Entfernen">✕</button>
+      </div>`).join('') : '<div class="hint">Noch keine Punkte — z. B. „Aufbau ab 7 Uhr", „Kasse startklar machen", „Abbau um 15 Uhr".</div>'}
+    <div class="inv-add-row no-print">
+      <input type="text" id="ablaufNewText" placeholder="Neuer Ablaufpunkt">
+      <button type="button" class="btn ghost sm" id="ablaufAddBtn">+ Hinzufügen</button>
+    </div>
+  </div>`;
+}
+function renderApp(){
+  const evt = state.selectedEventId ? state.events[state.selectedEventId] : null;
+  return `
+  <div class="app">
+    <header class="top no-print">
+      <div class="brand">
+        <div class="brand-mark">📋</div>
+        <div>
+          <h1 class="wordmark">Inventar &amp; Ablauf</h1>
+          <div class="sub">Red Lotus</div>
+        </div>
+      </div>
+      <div class="top-actions">
+        <a href="index.html" class="btn ghost sm">📅 Kalender</a>
+        <a href="einkaufsliste.html" class="btn ghost sm">🛒 Einkaufsliste</a>
+        <a href="preisrechner.html" class="btn ghost sm">🧮 Preisrechner</a>
+        <a href="alice.html" class="btn ghost sm">🤖 Alice</a>
+        <button type="button" class="btn ghost sm" id="logoutBtn">Abmelden</button>
+      </div>
+    </header>
+
+    ${renderEventPicker()}
+
+    ${!evt ? '<div class="empty-state">Kein passender Termin gefunden. Lege im Kalender einen Event/Wochenmarkt/Thyme &amp; Lime/Festival-Termin an, dann erscheint er hier automatisch.</div>' : `
+      <div class="panel" style="padding-bottom:12px;">
+        <h3>${escapeHtml(evt.anlass||'Termin')}</h3>
+        <div class="event-meta">${evt.date ? new Date(evt.date+'T00:00:00').toLocaleDateString('de-DE', {weekday:'long', day:'2-digit', month:'2-digit', year:'numeric'}) : ''}<span class="cat-pill">${CATEGORY_LABELS[evt.category]||evt.category||''}</span></div>
+      </div>
+      ${renderInventorySection(evt)}
+      ${renderAblaufSection(evt)}
+    `}
+  </div>
+  ${state.toast ? `<div class="toast ${state.toast.isErr?'err':''}">${escapeHtml(state.toast.msg)}</div>` : ''}
+  `;
+}
+
+function render(){
+  const el = document.getElementById('app');
+  if(!state.authUser){
+    el.innerHTML = renderLogin();
+    attachLoginHandlers();
+    return;
+  }
+  if(!state.loaded){
+    el.innerHTML = `<div class="app"><div class="empty-state"><span class="spinner"></span>Lädt…</div></div>`;
+    return;
+  }
+  el.innerHTML = renderApp();
+  attachAppHandlers();
+}
+
+function attachAppHandlers(){
+  const evt = state.selectedEventId ? state.events[state.selectedEventId] : null;
+
+  document.getElementById('logoutBtn').onclick = ()=> signOut(auth);
+  const sel = document.getElementById('eventSelect');
+  if(sel) sel.onchange = ()=>{ state.selectedEventId = sel.value || null; render(); };
+  const printBtn = document.getElementById('printBtn');
+  if(printBtn) printBtn.onclick = ()=> window.print();
+
+  document.querySelectorAll('[data-toggle-cat]').forEach(t=>{
+    t.onclick = ()=>{ const k = t.getAttribute('data-toggle-cat'); state.openCats[k] = !state.openCats[k]; render(); };
+  });
+
+  if(!evt) return;
+
+  document.querySelectorAll('[data-inv-check]').forEach(cb=>{
+    cb.onchange = ()=> toggleInvItem(evt, cb.getAttribute('data-inv-check'));
+  });
+  document.querySelectorAll('[data-inv-remove]').forEach(btn=>{
+    btn.onclick = ()=>{ if(confirm('Diesen Punkt entfernen?')) removeInvItem(evt, btn.getAttribute('data-inv-remove')); };
+  });
+  document.querySelectorAll('[data-inv-add]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const cat = btn.getAttribute('data-inv-add');
+      const input = document.querySelector(`[data-inv-add-name="${cat}"]`);
+      if(input){ addInvItem(evt, cat, input.value); input.value=''; }
+    };
+  });
+  document.querySelectorAll('[data-inv-add-name]').forEach(inp=>{
+    inp.onkeydown = (ev)=>{ if(ev.key==='Enter'){ ev.preventDefault(); document.querySelector(`[data-inv-add="${inp.getAttribute('data-inv-add-name')}"]`).click(); } };
+  });
+
+  document.querySelectorAll('[data-ablauf-check]').forEach(cb=>{
+    cb.onchange = ()=> toggleAblaufItem(evt, cb.getAttribute('data-ablauf-check'));
+  });
+  document.querySelectorAll('[data-ablauf-remove]').forEach(btn=>{
+    btn.onclick = ()=>{ if(confirm('Diesen Ablaufpunkt entfernen?')) removeAblaufItem(evt, btn.getAttribute('data-ablauf-remove')); };
+  });
+  document.querySelectorAll('[data-ablauf-up]').forEach(btn=>{
+    btn.onclick = ()=> moveAblaufItem(evt, btn.getAttribute('data-ablauf-up'), -1);
+  });
+  document.querySelectorAll('[data-ablauf-down]').forEach(btn=>{
+    btn.onclick = ()=> moveAblaufItem(evt, btn.getAttribute('data-ablauf-down'), 1);
+  });
+  const ablaufAddBtn = document.getElementById('ablaufAddBtn');
+  const ablaufNewText = document.getElementById('ablaufNewText');
+  if(ablaufAddBtn && ablaufNewText){
+    ablaufAddBtn.onclick = ()=>{ addAblaufItem(evt, ablaufNewText.value); ablaufNewText.value=''; };
+    ablaufNewText.onkeydown = (ev)=>{ if(ev.key==='Enter'){ ev.preventDefault(); ablaufAddBtn.click(); } };
+  }
+}
+
+/* ============================= INIT ============================= */
+onAuthStateChanged(auth, (user)=>{
+  if(user){
+    state.authUser = user; state.authError = null; state.authBusy = false;
+    if(!state.loaded){ startSync(); }
+  } else {
+    state.authUser = null; state.loaded = false; stopSync();
+  }
+  render();
+});
+render();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw-inventarablauf.js').catch(()=>{}); });
+}
+</script>
+</body>
+</html>
