@@ -984,9 +984,46 @@ const CATEGORY_ORDER = ['event','wochenmarkt','thymeandlime','festivalTL','sonst
 const CATEGORY_LABELS = {event:'Event', wochenmarkt:'Wochenmarkt', thymeandlime:'Thyme & Lime', festivalTL:'Festivals & Wochenmärkte (T&L)', sonstiges:'Sonstiges', muell:'Müllabfuhr'};
 const CATEGORY_COLORS = {event:'#8f1d33', wochenmarkt:'#2e5e8f', thymeandlime:'#3d6b4a', festivalTL:'#6b8f3d', sonstiges:'#b5872e', muell:'#5a5651'};
 
-// Abo-Kalender-Link (Apple/Samsung/Google Kalender) — muss zum
-// ICS_FEED_SECRET in functions/index.js passen.
-const ICS_FEED_URL = 'https://us-central1-red-lotus-eventkalender.cloudfunctions.net/calendarFeed?key=rl_ics_p9k3wq7m2x';
+// Abo-Kalender-Link (Apple/Samsung/Google Kalender).
+// Früher stand hier ein fester, für alle gleicher Schlüssel — der lag damit im
+// öffentlichen Quelltext der App und hätte jedem Zugriff auf den kompletten
+// Terminkalender inklusive Kundennamen und -adressen gegeben.
+// Jetzt bekommt jedes Team-Mitglied einen eigenen, zufälligen Zugang, der in
+// Firestore unter der eigenen Nutzer-ID liegt (Collection "calendar_tokens").
+// Vorteil: Der Link steht nirgends im Code, und ein einzelner Zugang lässt
+// sich widerrufen, ohne alle anderen zu stören.
+const ICS_FEED_BASE = 'https://us-central1-red-lotus-eventkalender.cloudfunctions.net/calendarFeed';
+let icsFeedUrl = '';
+
+function neuerFeedToken(){
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Holt den persönlichen Abo-Link; legt beim ersten Aufruf einen Zugang an.
+async function ladeIcsFeedUrl(){
+  const user = auth.currentUser;
+  if(!user){ icsFeedUrl = ''; return ''; }
+  try{
+    const ref = doc(db, 'calendar_tokens', user.uid);
+    const snap = await getDoc(ref);
+    let token = snap.exists() ? (snap.data().token || '') : '';
+    if(!token){
+      token = neuerFeedToken();
+      await setDoc(ref, {
+        token,
+        email: user.email || '',
+        createdAt: new Date().toISOString()
+      });
+    }
+    icsFeedUrl = ICS_FEED_BASE + '?key=' + token;
+  }catch(e){
+    console.error('Kalender-Abo-Link konnte nicht geladen werden:', e);
+    icsFeedUrl = '';
+  }
+  return icsFeedUrl;
+}
 
 // Öffentliche "website"-Collection: Speiseplan + News für die neue Red-Lotus-
 // Website. Nur Wochenmarkt-Gerichte und Event/Sonstiges-News, die hier
@@ -2260,7 +2297,7 @@ function renderEinstellungenTab(){
     <h3>Kalender-Abo (iPhone / Samsung)</h3>
     <p class="hint" style="margin-bottom:12px;">Alle Termine (Events, Wochenmärkte, Thyme & Lime, Festivals, Sonstiges, Müllabfuhr) automatisch im Handy-Kalender anzeigen — einmal einrichten, aktualisiert sich danach von selbst (meist alle paar Stunden). Läuft nur in eine Richtung: vom Red-Lotus-Kalender zum Handy, nicht umgekehrt.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
-      <input type="text" readonly id="icsFeedUrlInput" value="${ICS_FEED_URL}" style="flex:1;min-width:220px;background:var(--panel-2,#1c1b1a);color:inherit;border:1px solid var(--line,#333);border-radius:8px;padding:8px 10px;font-size:12px;">
+      <input type="text" readonly id="icsFeedUrlInput" value="${icsFeedUrl || 'Wird geladen …'}" style="flex:1;min-width:220px;background:var(--panel-2,#1c1b1a);color:inherit;border:1px solid var(--line,#333);border-radius:8px;padding:8px 10px;font-size:12px;">
       <button type="button" class="btn ghost sm" id="copyIcsFeedBtn">Link kopieren</button>
     </div>
     <p class="hint" style="margin-bottom:4px;"><b>iPhone (Apple Kalender):</b> Einstellungen → Kalender → Accounts → Account hinzufügen → Andere → Kalenderabo hinzufügen → Link einfügen.</p>
@@ -2677,10 +2714,19 @@ function attachGlobalHandlers(){
   const enablePushBtn = document.getElementById('enablePushBtn');
   if(enablePushBtn) enablePushBtn.onclick = enablePushNotifications;
 
+  // Persönlichen Abo-Link nachladen und ins Feld schreiben (läuft asynchron,
+  // weil der Zugang beim ersten Mal erst in Firestore angelegt werden muss).
+  ladeIcsFeedUrl().then((url)=>{
+    const input = document.getElementById('icsFeedUrlInput');
+    if(!input) return;
+    input.value = url || 'Link konnte nicht geladen werden — bitte neu anmelden.';
+  });
+
   const copyIcsFeedBtn = document.getElementById('copyIcsFeedBtn');
   if(copyIcsFeedBtn) copyIcsFeedBtn.onclick = async ()=>{
+    if(!icsFeedUrl){ showToast('Link noch nicht geladen — kurz warten.', true); return; }
     try{
-      await navigator.clipboard.writeText(ICS_FEED_URL);
+      await navigator.clipboard.writeText(icsFeedUrl);
       showToast('Link kopiert.');
     }catch(e){
       const input = document.getElementById('icsFeedUrlInput');
