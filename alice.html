@@ -231,12 +231,29 @@ const auth = getAuth(fbApp);
 const db = initializeFirestore(fbApp, { experimentalAutoDetectLongPolling: true }, "default");
 const googleProvider = new GoogleAuthProvider();
 
+/* Kopfzeilen für Aufrufe an unsere Cloud Functions. Früher hing an der URL ein
+   "?key=rl_wix_..." — der stand damit im öffentlichen Quelltext dieser Seite.
+   Jetzt schickt der Browser das Login-Token mit, das er nach der Anmeldung
+   ohnehin besitzt; die Function prüft es serverseitig gegen die Team-Liste.
+   getIdToken() erneuert ein abgelaufenes Token automatisch. */
+async function fnHeaders(){
+  const kopf = { 'Content-Type':'application/json' };
+  try{
+    const nutzer = auth.currentUser;
+    if(nutzer) kopf['Authorization'] = 'Bearer ' + (await nutzer.getIdToken());
+  }catch(e){
+    console.warn('Login-Token konnte nicht geholt werden:', e);
+  }
+  return kopf;
+}
+
+
 /* ============================= PUSH-BENACHRICHTIGUNGEN (FCM) ============================= */
 // Gleiches Projekt/Zertifikat wie im Kalender — ein einmal aktiviertes Gerät
 // bekommt Erinnerungen, unabhängig davon, über welche der beiden Apps es
 // registriert wurde.
 const VAPID_KEY = "BA4mfX39KrU8pt-n5UL_DtUAZ-VUzgO0OBjO1X7a1GVhxs4--77d9PHXbhdLdKhZNMB4SQ4qyIKht0mNi5575hQ";
-const REGISTER_PUSH_URL = "https://us-central1-red-lotus-eventkalender.cloudfunctions.net/registerPushToken?key=rl_wix_h7k2m9p4";
+const REGISTER_PUSH_URL = "https://us-central1-red-lotus-eventkalender.cloudfunctions.net/registerPushToken";
 
 async function enablePushNotifications(silent){
   try{
@@ -268,7 +285,7 @@ async function enablePushNotifications(silent){
     }
     await fetch(REGISTER_PUSH_URL, {
       method:'POST',
-      headers:{ 'Content-Type':'application/json' },
+      headers: await fnHeaders(),
       body: JSON.stringify({ token, email: (state.authUser && state.authUser.email) || '' })
     });
     state.pushEnabled = true;

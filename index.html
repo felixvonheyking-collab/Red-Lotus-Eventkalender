@@ -444,12 +444,36 @@ const auth = getAuth(fbApp);
 const db = initializeFirestore(fbApp, { experimentalAutoDetectLongPolling: true }, "default");
 const googleProvider = new GoogleAuthProvider();
 
+/* ===================== Aufrufe an unsere Cloud Functions =====================
+   Früher hing an jeder dieser URLs ein "?key=rl_wix_..." — der Schlüssel stand
+   damit im öffentlichen Quelltext dieser Seite und war für jeden lesbar, der
+   sich den Seitenquelltext ansieht. Ein Geheimnis im Browser ist kein Geheimnis.
+
+   Jetzt schickt der Browser stattdessen das Login-Token mit, das er nach der
+   Anmeldung ohnehin besitzt. Die Cloud Function prüft es serverseitig gegen
+   Google und zusätzlich gegen die Team-Liste. Nichts davon lässt sich fälschen,
+   und es läuft von selbst ab.
+
+   getIdToken() erneuert ein abgelaufenes Token automatisch, deshalb wird es bei
+   jedem Aufruf frisch geholt statt einmal zwischengespeichert.
+   ============================================================================= */
+async function fnHeaders(){
+  const kopf = { 'Content-Type':'application/json' };
+  try{
+    const nutzer = auth.currentUser;
+    if(nutzer) kopf['Authorization'] = 'Bearer ' + (await nutzer.getIdToken());
+  }catch(e){
+    console.warn('Login-Token konnte nicht geholt werden:', e);
+  }
+  return kopf;
+}
+
 /* ============================= PUSH-BENACHRICHTIGUNGEN (FCM) ============================= */
 // Einmaliger Schritt in der Firebase Console nötig, bevor das hier funktioniert:
 // Projekteinstellungen -> Cloud Messaging -> "Web-Push-Zertifikate" -> Schlüsselpaar
 // erzeugen -> den Schlüssel unten bei VAPID_KEY einsetzen.
 const VAPID_KEY = "BA4mfX39KrU8pt-n5UL_DtUAZ-VUzgO0OBjO1X7a1GVhxs4--77d9PHXbhdLdKhZNMB4SQ4qyIKht0mNi5575hQ";
-const REGISTER_PUSH_URL = "https://us-central1-red-lotus-eventkalender.cloudfunctions.net/registerPushToken?key=rl_wix_h7k2m9p4";
+const REGISTER_PUSH_URL = "https://us-central1-red-lotus-eventkalender.cloudfunctions.net/registerPushToken";
 // Merkt sich dauerhaft (pro Browser), ob Push schon einmal aktiviert wurde,
 // damit die UI nach einem Reload nicht wieder "nicht aktiviert" anzeigt und
 // man erneut klicken muss.
@@ -484,7 +508,7 @@ async function enablePushNotifications(silent){
     }
     await fetch(REGISTER_PUSH_URL, {
       method:'POST',
-      headers:{ 'Content-Type':'application/json' },
+      headers: await fnHeaders(),
       body: JSON.stringify({ token, email: (state.authUser && state.authUser.email) || '' })
     });
     pushEnabled = true;
@@ -600,7 +624,7 @@ async function connectGoogleCalendar(){
 
 /* ============================= GMAIL-PROTOKOLL ============================= */
 const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
-const SUMMARIZE_URL = "https://summarizeeventemails-e6seurotja-uc.a.run.app?key=rl_wix_h7k2m9p4";
+const SUMMARIZE_URL = "https://summarizeeventemails-e6seurotja-uc.a.run.app";
 
 /* ============================= TEAM-ZUWEISUNG ============================= */
 const TEAM_MEMBERS = [
@@ -615,7 +639,7 @@ const TEAM_MEMBERS = [
 // TODO nach dem ersten Deploy der neuen Cloud Function "assignTeamEmail" prüfen,
 // ob die URL exakt so lautet (Firebase gibt sie beim Deploy aus) — Muster wie
 // bei SUMMARIZE_URL oben, nur mit dem neuen Funktionsnamen.
-const ASSIGN_EMAIL_URL = "https://us-central1-red-lotus-eventkalender.cloudfunctions.net/assignTeamEmail?key=rl_wix_h7k2m9p4";
+const ASSIGN_EMAIL_URL = "https://us-central1-red-lotus-eventkalender.cloudfunctions.net/assignTeamEmail";
 // Kurze Fakten-Zusammenfassung des Angebots für die Zuweisungs-Mail —
 // damit Lukas/Domi/Pearl beim Zusagen sofort sehen, um was es geht, ohne
 // erst den Kalender öffnen zu müssen.
@@ -632,11 +656,14 @@ Personen: ${evt.people || '—'}
 Gerichte: ${dishNames}
 Summe (brutto): ${fmtEUR(total)}`;
 }
-function notifyTeamAssignment(evt, toEmail){
+// async, weil die Kopfzeilen jetzt das Login-Token enthalten und dieses
+// asynchron geholt wird. Der Aufrufer wartet bewusst nicht darauf ab —
+// die Mail geht im Hintergrund raus, Fehler landen unten in .catch().
+async function notifyTeamAssignment(evt, toEmail){
   const member = TEAM_MEMBERS.find(m=>m.email===toEmail);
   fetch(ASSIGN_EMAIL_URL, {
     method:'POST',
-    headers:{ 'Content-Type':'application/json' },
+    headers: await fnHeaders(),
     body: JSON.stringify({
       toEmail,
       toName: member ? member.name : '',
@@ -812,7 +839,7 @@ async function generateEmailProtokoll(evt){
     try{
       res = await fetch(SUMMARIZE_URL, {
         method:'POST',
-        headers:{'Content-Type':'application/json'},
+        headers: await fnHeaders(),
         body: JSON.stringify({
           emails: allEmails,
           eventContext: { anlass: evt.anlass, date: evt.date, people: evt.people, contactName: evt.contactName }
@@ -3015,7 +3042,7 @@ function openChecklistPrint(evt, type){
   if(sendBtn) sendBtn.onclick = ()=>sendChecklistToTeam(evt, type, title, sendBtn);
 }
 
-const SEND_CHECKLIST_EMAIL_URL = "https://us-central1-red-lotus-eventkalender.cloudfunctions.net/sendChecklistEmail?key=rl_wix_h7k2m9p4";
+const SEND_CHECKLIST_EMAIL_URL = "https://us-central1-red-lotus-eventkalender.cloudfunctions.net/sendChecklistEmail";
 async function sendChecklistToTeam(evt, type, title, btn){
   const checked = Array.from(document.querySelectorAll('[data-checklist-mail-to]:checked')).map(cb=>cb.dataset.checklistMailTo);
   if(!checked.length){ showToast('Bitte mindestens eine Person auswählen.', true); return; }
@@ -3048,7 +3075,7 @@ async function sendChecklistToTeam(evt, type, title, btn){
       try{
         const res = await fetch(SEND_CHECKLIST_EMAIL_URL, {
           method:'POST',
-          headers:{ 'Content-Type':'application/json' },
+          headers: await fnHeaders(),
           body: JSON.stringify({
             toEmail: email,
             toName: member ? member.name : '',
@@ -3376,7 +3403,7 @@ function openOfferPrint(evt, opts){
 // "sendInvoiceEmail", die es per Gmail-SMTP an die Kunden-E-Mail-Adresse
 // weiterleitet. Kein automatischer Versand — Felix löst das bewusst aus,
 // nachdem er die Rechnung kontrolliert/angepasst hat.
-const SEND_INVOICE_EMAIL_URL = "https://us-central1-red-lotus-eventkalender.cloudfunctions.net/sendInvoiceEmail?key=rl_wix_h7k2m9p4";
+const SEND_INVOICE_EMAIL_URL = "https://us-central1-red-lotus-eventkalender.cloudfunctions.net/sendInvoiceEmail";
 async function sendInvoiceEmail(evt, btn){
   const body = document.querySelector('#printArea .invoice-body');
   if(!body){ showToast('Rechnung nicht gefunden.', true); return; }
@@ -3406,7 +3433,7 @@ async function sendInvoiceEmail(evt, btn){
     btn.textContent = 'Sende…';
     const res = await fetch(SEND_INVOICE_EMAIL_URL, {
       method:'POST',
-      headers:{ 'Content-Type':'application/json' },
+      headers: await fnHeaders(),
       body: JSON.stringify({
         toEmail: evt.email,
         toName: evt.contactName || '',

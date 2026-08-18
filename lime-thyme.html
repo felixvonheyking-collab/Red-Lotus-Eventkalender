@@ -370,6 +370,23 @@ const auth = getAuth(fbApp);
 const db = initializeFirestore(fbApp, { experimentalAutoDetectLongPolling: true }, "default");
 const googleProvider = new GoogleAuthProvider();
 
+/* Kopfzeilen für Aufrufe an unsere Cloud Functions. Früher hing an der URL ein
+   "?key=rl_wix_..." — der stand damit im öffentlichen Quelltext dieser Seite.
+   Jetzt schickt der Browser das Login-Token mit, das er nach der Anmeldung
+   ohnehin besitzt; die Function prüft es serverseitig gegen die Team-Liste.
+   getIdToken() erneuert ein abgelaufenes Token automatisch. */
+async function fnHeaders(){
+  const kopf = { 'Content-Type':'application/json' };
+  try{
+    const nutzer = auth.currentUser;
+    if(nutzer) kopf['Authorization'] = 'Bearer ' + (await nutzer.getIdToken());
+  }catch(e){
+    console.warn('Login-Token konnte nicht geholt werden:', e);
+  }
+  return kopf;
+}
+
+
 /* ============================= GOOGLE KALENDER SYNC ============================= */
 // Eigenständiger OAuth-Zugriff nur für die Google-Calendar-API (unabhängig vom
 // normalen Login). Muss einmalig in der Google Cloud Console eingerichtet werden:
@@ -430,7 +447,7 @@ async function connectGoogleCalendar(){
 
 /* ============================= GMAIL-PROTOKOLL ============================= */
 const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
-const SUMMARIZE_URL = "https://summarizeeventemails-e6seurotja-uc.a.run.app?key=rl_wix_h7k2m9p4";
+const SUMMARIZE_URL = "https://summarizeeventemails-e6seurotja-uc.a.run.app";
 const GMAIL_INBOXES = [
   { id:'inbox1', label:'redlotus.asianfood@gmail.com' },
   { id:'inbox2', label:'info@redlotus-asianfood.com' }
@@ -549,7 +566,7 @@ async function generateEmailProtokoll(evt){
     try{
       res = await fetch(SUMMARIZE_URL, {
         method:'POST',
-        headers:{'Content-Type':'application/json'},
+        headers: await fnHeaders(),
         body: JSON.stringify({
           emails: allEmails,
           eventContext: { anlass: evt.anlass, date: evt.date, people: evt.people, contactName: evt.contactName }
