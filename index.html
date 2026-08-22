@@ -410,7 +410,7 @@ function showFatalError(title, detail){
   const el = document.getElementById('app');
   if(!el) return;
   el.innerHTML = `<div style="max-width:600px;margin:60px auto;padding:20px;background:#2a1116;border:1px solid #b02942;border-radius:14px;color:#f6efe2;font-family:sans-serif;">
-    <h2 style="color:#f2c9d1;margin-top:0;">${title}</h2>
+    <h2 style="color:#f2c9d1;margin-top:0;">${(title||'').toString().replace(/</g,'&lt;')}</h2>
     <p style="font-size:13px;opacity:0.85;white-space:pre-wrap;word-break:break-word;">${(detail||'').toString().replace(/</g,'&lt;')}</p>
     <p style="font-size:12px;opacity:0.6;">Bitte mach hiervon einen Screenshot.</p>
   </div>`;
@@ -630,8 +630,9 @@ const SUMMARIZE_URL = "https://summarizeeventemails-e6seurotja-uc.a.run.app";
 const TEAM_MEMBERS = [
   { name:'Pearl', fullName:'Pimpaka von Heyking', email:'beepowpaw@gmail.com', brand:'redlotus' },
   { name:'Felix', email:'felix.vonheyking@gmail.com', brand:'redlotus' },
-  { name:'Domi',  email:'kontakt@reka-restaurant.de', brand:'limethyme' },
-  { name:'Lukas', email:'lukas.laemmle@icloud.com', brand:'limethyme' },
+  // Domi & Lukas am 22.08.2026 entfernt (seit 17.08. nicht mehr beteiligt, siehe Wiki).
+  // WICHTIG: Zugriff zusätzlich in der Firebase-Konsole entziehen (firestore.rules
+  // + Authentication + Team-Liste in den Cloud Functions) — der Client ist nur Anzeige.
   // Prang & Suki: nur interne Stundenerfassung, kein App-Login, keine Zuweisungs-Mail.
   { name:'Prang', fullName:'Teerada Hoffman', email:'prang.intern', internal:true, brand:'redlotus' },
   { name:'Suki',  fullName:'Sukanya Banchuen', email:'suki.intern', internal:true, brand:'redlotus' }
@@ -1008,7 +1009,7 @@ const CATEGORY_ORDER = ['event','wochenmarkt','thymeandlime','festivalTL','sonst
 // "muell" bewusst NICHT in CATEGORY_ORDER — diese Termine entstehen nur über
 // den ICS-Import in den Einstellungen, nicht über die normale "Neuer
 // Termin"-Auswahl.
-const CATEGORY_LABELS = {event:'Event', wochenmarkt:'Wochenmarkt', thymeandlime:'Thyme & Lime', festivalTL:'Festivals & Wochenmärkte (T&L)', sonstiges:'Sonstiges', muell:'Müllabfuhr'};
+const CATEGORY_LABELS = {event:'Event', wochenmarkt:'Wochenmarkt', thymeandlime:'Streetfood', festivalTL:'Festivals & Wochenmärkte (Streetfood)', sonstiges:'Sonstiges', muell:'Müllabfuhr'};
 const CATEGORY_COLORS = {event:'#8f1d33', wochenmarkt:'#2e5e8f', thymeandlime:'#3d6b4a', festivalTL:'#6b8f3d', sonstiges:'#b5872e', muell:'#5a5651'};
 
 // Abo-Kalender-Link (Apple/Samsung/Google Kalender).
@@ -1420,20 +1421,20 @@ async function syncWebsiteForEvent(event){
           updatedAt: serverTimestamp()
         });
         if(prevDocId && prevDocId!==docId){
-          await deleteDoc(doc(db,'website',prevDocId)).catch(()=>{});
+          await deleteDoc(doc(db,'website',prevDocId)).catch(e=>console.warn('Nebenaufgabe fehlgeschlagen (index):', e));
         }
         if(event._websiteDocId!==docId){
           event._websiteDocId = docId;
-          await setDoc(doc(db,'events',event.id), { _websiteDocId: docId }, {merge:true}).catch(()=>{});
+          await setDoc(doc(db,'events',event.id), { _websiteDocId: docId }, {merge:true}).catch(e=>console.warn('Nebenaufgabe fehlgeschlagen (index):', e));
         }
       } else {
         if(checked.length && !WEBSITE_ORT_SLUGS[ort]){
           showToast('Website-Standort fehlt — bitte oben auswählen, damit die markierten Gerichte auf der Website erscheinen.', true);
         }
         if(prevDocId){
-          await deleteDoc(doc(db,'website',prevDocId)).catch(()=>{});
+          await deleteDoc(doc(db,'website',prevDocId)).catch(e=>console.warn('Nebenaufgabe fehlgeschlagen (index):', e));
           event._websiteDocId = null;
-          await setDoc(doc(db,'events',event.id), { _websiteDocId: null }, {merge:true}).catch(()=>{});
+          await setDoc(doc(db,'events',event.id), { _websiteDocId: null }, {merge:true}).catch(e=>console.warn('Nebenaufgabe fehlgeschlagen (index):', e));
         }
       }
     } else if(event.category==='event' || event.category==='sonstiges'){
@@ -1451,7 +1452,7 @@ async function syncWebsiteForEvent(event){
         if(event.publicDatumBis) data.datumBis = event.publicDatumBis;
         await setDoc(doc(db,'website',docId), data);
       } else {
-        await deleteDoc(doc(db,'website',docId)).catch(()=>{});
+        await deleteDoc(doc(db,'website',docId)).catch(e=>console.warn('Nebenaufgabe fehlgeschlagen (index):', e));
       }
     }
   }catch(e){
@@ -1466,9 +1467,9 @@ async function clearWebsiteForEvent(event){
   if(!event) return;
   try{
     if(event.category==='wochenmarkt' && event._websiteDocId){
-      await deleteDoc(doc(db,'website',event._websiteDocId)).catch(()=>{});
+      await deleteDoc(doc(db,'website',event._websiteDocId)).catch(e=>console.warn('Nebenaufgabe fehlgeschlagen (index):', e));
     } else if(event.category==='event' || event.category==='sonstiges'){
-      await deleteDoc(doc(db,'website','news_'+event.id)).catch(()=>{});
+      await deleteDoc(doc(db,'website','news_'+event.id)).catch(e=>console.warn('Nebenaufgabe fehlgeschlagen (index):', e));
     }
   }catch(e){ console.error('Website-Cleanup-Fehler:', e); }
 }
@@ -3479,7 +3480,7 @@ render(); // zeigt sofort die Login-Maske, während Firebase im Hintergrund den 
 
 // Macht die Seite als "richtige App" installierbar (Homescreen-Icon, Vollbild).
 if('serviceWorker' in navigator){
-  window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
+  window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js').catch(e=>console.warn('Nebenaufgabe fehlgeschlagen (index):', e)); });
 }
 
 </script>

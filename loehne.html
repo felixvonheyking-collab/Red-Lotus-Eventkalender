@@ -157,7 +157,7 @@ function showFatalError(title, detail){
   const el = document.getElementById('app');
   if(!el) return;
   el.innerHTML = `<div style="max-width:600px;margin:60px auto;padding:20px;background:#2a1116;border:1px solid #b02942;border-radius:14px;color:#f6efe2;font-family:sans-serif;">
-    <h2 style="color:#f2c9d1;margin-top:0;">${title}</h2>
+    <h2 style="color:#f2c9d1;margin-top:0;">${(title||'').toString().replace(/</g,'&lt;')}</h2>
     <p style="font-size:13px;opacity:0.85;white-space:pre-wrap;word-break:break-word;">${(detail||'').toString().replace(/</g,'&lt;')}</p>
     <p style="font-size:12px;opacity:0.6;">Bitte mach hiervon einen Screenshot.</p>
   </div>`;
@@ -185,14 +185,14 @@ const DEFAULT_LOGO = "logo-maneki.png";
 const TEAM_MEMBERS = [
   { name:'Pearl', fullName:'Pimpaka von Heyking', email:'beepowpaw@gmail.com', brand:'redlotus' },
   { name:'Felix', email:'felix.vonheyking@gmail.com', brand:'redlotus' },
-  { name:'Domi',  email:'kontakt@reka-restaurant.de', brand:'limethyme' },
-  { name:'Lukas', email:'lukas.laemmle@icloud.com', brand:'limethyme' },
+  // Domi & Lukas am 22.08.2026 entfernt (nicht mehr beteiligt). Historische
+  // Lohndaten (falls vorhanden) bleiben in Firestore, sind nur nicht mehr anwählbar.
   { name:'Prang', fullName:'Teerada Hoffman', email:'prang.intern', internal:true, brand:'redlotus' },
   { name:'Suki',  fullName:'Sukanya Banchuen', email:'suki.intern', internal:true, brand:'redlotus' }
 ];
 const CATEGORY_LABELS = {
   event:'Event', wochenmarkt:'Wochenmarkt', festival:'Festival',
-  thymeandlime:'Lime & Thyme', sonstiges:'Sonstiges', muell:'Müllabfuhr'
+  thymeandlime:'Streetfood', sonstiges:'Sonstiges', muell:'Müllabfuhr'
 };
 
 function escapeHtml(s){
@@ -405,8 +405,8 @@ function renderApp(){
       <h3>Stundensätze</h3>
       <p class="hint" style="margin-bottom:12px;">Stundenlohn je Mitarbeiter — Grundlage für die Betragsberechnung unten. Nur für dich als Geschäftsführung sichtbar.</p>
       ${[
-        { id:'redlotus', label:'Red Lotus' },
-        { id:'limethyme', label:'Lime & Thyme' }
+        { id:'redlotus', label:'Red Lotus' }
+        // 'limethyme' entfernt am 22.08.2026 — keine Mitglieder mehr (Domi/Lukas raus)
       ].map(brand => `
         <div class="sub-title" style="margin-top:${brand.id==='redlotus'?'0':'18px'};">${brand.id==='redlotus'?'🔴':'🟢'} ${brand.label}</div>
         ${TEAM_MEMBERS.filter(m=>m.brand===brand.id).map(m=>`

@@ -169,7 +169,7 @@ function showFatalError(title, detail){
   const el = document.getElementById('app');
   if(!el) return;
   el.innerHTML = `<div style="max-width:600px;margin:60px auto;padding:20px;background:#2a1116;border:1px solid #b02942;border-radius:14px;color:#f6efe2;font-family:sans-serif;">
-    <h2 style="color:#f2c9d1;margin-top:0;">${title}</h2>
+    <h2 style="color:#f2c9d1;margin-top:0;">${(title||'').toString().replace(/</g,'&lt;')}</h2>
     <p style="font-size:13px;opacity:0.85;white-space:pre-wrap;word-break:break-word;">${(detail||'').toString().replace(/</g,'&lt;')}</p>
     <p style="font-size:12px;opacity:0.6;">Bitte mach hiervon einen Screenshot.</p>
   </div>`;
@@ -561,7 +561,7 @@ onAuthStateChanged(auth, (user)=>{
 render();
 
 if('serviceWorker' in navigator){
-  window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw-inventarablauf.js').catch(()=>{}); });
+  window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw-inventarablauf.js').catch(e=>console.warn('Nebenaufgabe fehlgeschlagen (inventarablauf):', e)); });
 }
 </script>
 </body>

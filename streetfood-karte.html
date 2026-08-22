@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Streetfood-Karte — Red Lotus Tools</title>
+<style>
+/* Interner Pflege-Baustein für die Red-Lotus-Streetfood-Website.
+   Schreibt AUSSCHLIESSLICH das öffentliche Dokument website/streetfood_karte —
+   nichts Internes (Termine, Löhne, Kunden) wird hier gelesen oder geschrieben. */
+:root{
+  --ink:#141210; --ink-2:#1e1a17; --ink-3:#282320;
+  --red:#c8382b; --red-bright:#e0473a;
+  --gold:#d3b78c; --cream:#f5f0e6; --dim:#cdc6b8;
+  --ok:#5a9e6f; --line:rgba(211,183,140,.25);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{color-scheme:dark}
+body{background:var(--ink);color:var(--cream);font-family:'Work Sans','Helvetica Neue',Arial,sans-serif;font-size:15px;line-height:1.5;min-height:100vh;padding:20px}
+h1{font-family:Marcellus,Georgia,serif;font-size:22px;color:var(--gold);font-weight:400;margin-bottom:4px}
+.hint{color:var(--dim);font-size:13px;margin-bottom:20px}
+.card{background:linear-gradient(135deg,var(--ink-2),var(--ink-3));border:1px solid var(--line);border-radius:12px;padding:18px;max-width:760px;margin:0 auto 16px}
+label{display:block;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin:10px 0 4px}
+input[type=text]{width:100%;background:var(--ink);border:1px solid var(--line);border-radius:8px;color:var(--cream);padding:9px 11px;font:inherit}
+input[type=text]:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--red-bright);outline-offset:2px}
+select{background:var(--ink);border:1px solid var(--line);border-radius:8px;color:var(--cream);padding:9px 8px;font:inherit}
+button{cursor:pointer;font:inherit;border-radius:8px;border:1px solid var(--line);background:var(--ink-3);color:var(--cream);padding:9px 14px}
+button:hover{border-color:var(--gold)}
+.btn-primary{background:var(--red);border-color:var(--red);font-weight:600}
+.btn-primary:hover{background:var(--red-bright);border-color:var(--red-bright)}
+.btn-ghost{background:transparent}
+.gericht-zeile{display:grid;grid-template-columns:minmax(0,1.2fr) 110px minmax(0,1.4fr) 90px auto auto;gap:8px;align-items:center;padding:10px 0;border-bottom:1px dashed var(--line)}
+.gericht-zeile .flags{display:flex;gap:10px;font-size:12px;color:var(--dim);white-space:nowrap}
+.gericht-zeile .flags label{display:inline-flex;align-items:center;gap:4px;margin:0;text-transform:none;letter-spacing:0;color:var(--dim);font-size:12px;cursor:pointer}
+.gericht-zeile input[type=checkbox]{accent-color:var(--red-bright);width:15px;height:15px}
+@media (max-width:680px){.gericht-zeile{grid-template-columns:1fr 1fr;padding:12px 0}.gericht-zeile>*{grid-column:span 1}.gericht-zeile input[type=text]:first-child{grid-column:1/-1}}
+.zeilen-knoepfe{display:flex;gap:6px}
+.zeilen-knoepfe button{padding:6px 10px;font-size:13px}
+.archiv{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px dashed var(--gold);border-radius:999px;padding:4px 12px;font-size:13px;color:var(--gold)}
+.chip button{border:none;background:none;color:var(--dim);padding:0;font-size:15px;line-height:1}
+.chip button:hover{color:var(--red-bright)}
+.fuss{display:flex;gap:10px;align-items:center;margin-top:16px;flex-wrap:wrap}
+.status{font-size:13px;color:var(--dim)}
+.status.ok{color:var(--ok)}
+.status.fehler{color:var(--red-bright)}
+#login{max-width:400px;margin:12vh auto}
+#login input{margin-bottom:10px}
+.top{display:flex;justify-content:space-between;align-items:baseline;max-width:760px;margin:0 auto 14px;gap:12px;flex-wrap:wrap}
+.top a{color:var(--dim);font-size:13px}
+</style>
+</head>
+<body>
+<div class="top">
+  <div>
+    <h1>Streetfood-Karte</h1>
+    <p class="hint">Pflegt die Monatskarte auf redlotusstreetfood.com — Dokument <code>website/streetfood_karte</code></p>
+  </div>
+  <button id="logout" class="btn-ghost" hidden>Abmelden</button>
+</div>
+
+<div class="card" id="login">
+  <label for="login-mail">E-Mail</label>
+  <input type="text" id="login-mail" autocomplete="username" inputmode="email" spellcheck="false">
+  <label for="login-pass">Passwort</label>
+  <input type="password" id="login-pass" autocomplete="current-password" style="width:100%;background:var(--ink);border:1px solid var(--line);border-radius:8px;color:var(--cream);padding:9px 11px;font:inherit">
+  <div class="fuss">
+    <button class="btn-primary" id="btn-mail">Mit E-Mail anmelden</button>
+    <button id="btn-google">Mit Google anmelden</button>
+    <span class="status" id="login-status"></span>
+  </div>
+</div>
+
+<div class="card" id="editor" hidden>
+  <label for="monat">Monat (z.&nbsp;B. „September")</label>
+  <input type="text" id="monat" spellcheck="false" autocomplete="off">
+
+  <label>Gerichte (Reihenfolge = Reihenfolge auf der Website; Dauerbrenner steht dort automatisch oben)</label>
+  <div id="zeilen"></div>
+  <div class="fuss">
+    <button id="plus">+ Gericht</button>
+    <span class="status">Stempel: BKK Bangkok · SEL Seoul · TYO Tokyo · HAN Hanoi · HKG Hongkong</span>
+  </div>
+
+  <label>Stempel-Archiv („Wo wir schon waren" — beim Speichern eines neuen Monats wandert der alte automatisch hierher)</label>
+  <div class="archiv" id="archiv"></div>
+
+  <div class="fuss">
+    <button class="btn-primary" id="speichern">Auf Website veröffentlichen</button>
+    <span class="status" id="status"></span>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
+import { initializeFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA0y6NWpF3N7241mA72Cj-gU_pvbqpNdD4",
+  authDomain: "red-lotus-eventkalender.firebaseapp.com",
+  projectId: "red-lotus-eventkalender",
+  storageBucket: "red-lotus-eventkalender.firebasestorage.app",
+  messagingSenderId: "864967561482",
+  appId: "1:864967561482:web:98ee51f304748e511f2af3"
+};
+const fbApp = initializeApp(firebaseConfig);
+const auth = getAuth(fbApp);
+const db = initializeFirestore(fbApp, { experimentalAutoDetectLongPolling: true }, "default");
+
+const STEMPEL = ["", "BKK", "SEL", "TYO", "HAN", "HKG"];
+const $ = id => document.getElementById(id);
+let archiv = [];
+
+function zeileHtml(g = {}){
+  const z = document.createElement("div");
+  z.className = "gericht-zeile";
+  z.innerHTML = `
+    <input type="text" class="f-name" placeholder="Gericht" value="">
+    <select class="f-stempel" aria-label="Herkunfts-Stempel">${STEMPEL.map(s=>`<option${s===(g.stempel||"")?" selected":""}>${s}</option>`).join("")}</select>
+    <input type="text" class="f-zusatz" placeholder="Zusatz (z. B. vegan möglich)" value="">
+    <input type="text" class="f-preis" placeholder="9,90" inputmode="decimal" value="">
+    <span class="flags">
+      <label><input type="checkbox" class="f-vegan"> vegan</label>
+      <label><input type="checkbox" class="f-scharf"> scharf</label>
+      <label><input type="checkbox" class="f-db"> Dauerbrenner</label>
+    </span>
+    <span class="zeilen-knoepfe">
+      <button type="button" class="hoch" aria-label="Nach oben">↑</button>
+      <button type="button" class="runter" aria-label="Nach unten">↓</button>
+      <button type="button" class="weg" aria-label="Gericht entfernen">✕</button>
+    </span>`;
+  z.querySelector(".f-name").value = g.name || "";
+  z.querySelector(".f-zusatz").value = g.zusatz || "";
+  z.querySelector(".f-preis").value = g.preis || "";
+  z.querySelector(".f-vegan").checked = !!g.vegan;
+  z.querySelector(".f-scharf").checked = !!g.scharf;
+  z.querySelector(".f-db").checked = !!g.dauerbrenner;
+  z.querySelector(".weg").onclick = () => { if(confirm("Gericht entfernen?")) z.remove(); };
+  z.querySelector(".hoch").onclick = () => z.previousElementSibling && z.parentNode.insertBefore(z, z.previousElementSibling);
+  z.querySelector(".runter").onclick = () => z.nextElementSibling && z.parentNode.insertBefore(z.nextElementSibling, z);
+  return z;
+}
+
+function archivZeichnen(){
+  const wrap = $("archiv");
+  wrap.innerHTML = "";
+  if(!archiv.length){ wrap.innerHTML = '<span class="status">noch leer</span>'; return; }
+  archiv.forEach((m,i)=>{
+    const c = document.createElement("span");
+    c.className = "chip";
+    c.innerHTML = `${m} <button type="button" aria-label="${m} aus dem Archiv entfernen">✕</button>`;
+    c.querySelector("button").onclick = ()=>{ archiv.splice(i,1); archivZeichnen(); };
+    wrap.appendChild(c);
+  });
+}
+
+function kuerzel(monat){
+  const m = (monat||"").trim().split(/\s+/)[0].slice(0,3).toUpperCase();
+  return m || null;
+}
+
+async function laden(){
+  const s = $("status");
+  try{
+    const snap = await getDoc(doc(db,"website","streetfood_karte"));
+    $("zeilen").innerHTML = "";
+    if(snap.exists()){
+      const d = snap.data();
+      $("monat").value = d.monat || "";
+      $("monat").dataset.geladen = d.monat || "";
+      (d.gerichte||[]).forEach(g=>$("zeilen").appendChild(zeileHtml(g)));
+      archiv = Array.isArray(d.archiv) ? d.archiv.slice() : [];
+    } else {
+      $("monat").value = "";
+      $("monat").dataset.geladen = "";
+      archiv = [];
+      $("zeilen").appendChild(zeileHtml({name:"Loaded Fries", dauerbrenner:true}));
+    }
+    if(!$("zeilen").children.length) $("zeilen").appendChild(zeileHtml());
+    archivZeichnen();
+    s.textContent = ""; s.className = "status";
+  }catch(e){
+    s.textContent = "Laden fehlgeschlagen: " + (e.message||e); s.className = "status fehler";
+  }
+}
+
+async function speichern(){
+  const s = $("status");
+  const monat = $("monat").value.trim();
+  if(!monat){ s.textContent = "Bitte Monat angeben."; s.className="status fehler"; return; }
+  const gerichte = [...$("zeilen").children].map(z=>({
+    name: z.querySelector(".f-name").value.trim(),
+    stempel: z.querySelector(".f-stempel").value,
+    zusatz: z.querySelector(".f-zusatz").value.trim(),
+    preis: z.querySelector(".f-preis").value.trim(),
+    vegan: z.querySelector(".f-vegan").checked,
+    scharf: z.querySelector(".f-scharf").checked,
+    dauerbrenner: z.querySelector(".f-db").checked
+  })).filter(g=>g.name);
+  if(!gerichte.length){ s.textContent = "Mindestens ein Gericht mit Namen."; s.className="status fehler"; return; }
+
+  // Monatswechsel: alten Monat automatisch ins Archiv schieben
+  const vorher = $("monat").dataset.geladen || "";
+  if(vorher && vorher !== monat){
+    const k = kuerzel(vorher);
+    if(k && !archiv.includes(k)) archiv.push(k);
+  }
+
+  s.textContent = "Speichere…"; s.className = "status";
+  try{
+    await setDoc(doc(db,"website","streetfood_karte"), {
+      type: "streetfood_karte",
+      monat, gerichte, archiv,
+      updatedAt: serverTimestamp()
+    });
+    $("monat").dataset.geladen = monat;
+    archivZeichnen();
+    s.textContent = "Veröffentlicht ✓ (Website zeigt den Stand beim nächsten Laden)"; s.className = "status ok";
+  }catch(e){
+    s.textContent = "Speichern fehlgeschlagen: " + (e.message||e); s.className = "status fehler";
+  }
+}
+
+$("plus").onclick = ()=>$("zeilen").appendChild(zeileHtml());
+$("speichern").onclick = speichern;
+$("btn-mail").onclick = async ()=>{
+  const s = $("login-status"); s.textContent = "Anmelden…";
+  try{ await signInWithEmailAndPassword(auth, $("login-mail").value.trim(), $("login-pass").value); }
+  catch(e){ s.textContent = "Fehlgeschlagen: " + (e.code||e.message); }
+};
+$("btn-google").onclick = async ()=>{
+  const s = $("login-status"); s.textContent = "Anmelden…";
+  try{ await signInWithPopup(auth, new GoogleAuthProvider()); }
+  catch(e){ s.textContent = "Fehlgeschlagen: " + (e.code||e.message); }
+};
+$("logout").onclick = ()=>signOut(auth);
+
+onAuthStateChanged(auth, user=>{
+  $("login").hidden = !!user;
+  $("editor").hidden = !user;
+  $("logout").hidden = !user;
+  if(user) laden();
+});
+</script>
+</body>
+</html>

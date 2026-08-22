@@ -1,0 +1,60 @@
+rules_version = '2';
+// ============================================================================
+// Firestore-Sicherheitsregeln — Red Lotus Eventkalender
+// Versioniert am 22.08.2026 (vorher nur in der Firebase-Konsole).
+// DIESE DATEI ist ab jetzt die Quelle der Wahrheit: Änderungen hier machen,
+// dann in der Konsole einfügen und veröffentlichen (oder firebase deploy --only firestore:rules).
+//
+// Korrekturen gegenüber Felix' Chat-Kopie vom 22.08.:
+//  - "service cloud.firestoreA" → "cloud.firestore" (so wäre Veröffentlichen unmöglich —
+//    vermutlich Kopier-Artefakt; bitte einmal mit der Konsole abgleichen)
+//  - Komma nach dem letzten Listeneintrag entfernt
+//
+// Bekannte, BEWUSSTE Kompromisse (Audit 22.08.2026, siehe AUDIT-2026-08-22.md):
+//  - orders: öffentliches Update auf status/readyAt/items/paid/released — nötig für
+//    loginlose Tablets, ABER: auch Fremde könnten z. B. "paid" umschalten.
+//    Empfehlung mittelfristig: Firebase App Check aktivieren.
+//  - alerts: komplett offen (Lesen+Schreiben) — nur REIS!-Signal, kein Schaden außer Spam.
+// ============================================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Nur diese E-Mail-Adressen dürfen lesen/schreiben.
+    function isTeamMember() {
+      return request.auth != null &&
+        request.auth.token.email in [
+          'info@redlotus-asianfood.com',
+          'beepowpaw@gmail.com',
+          'felix.vonheyking@gmail.com',
+          'redlotus.asianfood@gmail.com'
+        ];
+    }
+    match /{document=**} {
+      allow read, write: if isTeamMember();
+    }
+    // Bestellsystem (Küchen-/Kundenbildschirm/Preisrechner): läuft ohne
+    // Login auf fest montierten Tablets. Lesen ist öffentlich (nur Nummer +
+    // Gerichte, keine Kundendaten). Erstellt werden Bestellungen
+    // ausschließlich über die Cloud Function "createOrder" (Admin-SDK,
+    // umgeht diese Regeln). Von den Bildschirmen aus dürfen nur Status,
+    // Zeitstempel, die einzelnen Gericht-Abhak-Zustände ("items"), der
+    // Bezahlt-Status ("paid", wichtig für Vorbestellungen) und die
+    // Küchen-Freigabe ("released") geändert werden.
+    match /orders/{orderId} {
+      allow read: if true;
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'readyAt', 'items', 'paid', 'released']);
+      allow create, delete: if false;
+    }
+    // REIS!-Alarm: gemeinsames Signal zwischen Küchenbildschirm und
+    // Preisrechner, ohne Login. Enthält keine sensiblen Daten.
+    match /alerts/{alertId} {
+      allow read, write: if true;
+    }
+    // Öffentlicher Speiseplan/News/Streetfood-Karte auf den Websites:
+    // nur Lesen, kein Login. Geschrieben wird ausschließlich aus der App
+    // von Team-Mitgliedern (deckt auch website/streetfood_karte ab).
+    match /website/{docId} {
+      allow read: if true;
+      allow write: if isTeamMember();
+    }
+  }
+}
