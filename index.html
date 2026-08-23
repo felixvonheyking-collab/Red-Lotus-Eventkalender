@@ -1005,12 +1005,21 @@ const NEBENKOSTEN = {'Foodtruckcatering':{type:'flat',value:700},'Buffet':{type:
 const NEBENKOSTEN_CHOICES = [null,750,650,550,0]; // null = automatisch nach Art
 
 /* Terminkategorien — jede mit eigener Farbe und eigenem Formular */
-const CATEGORY_ORDER = ['event','wochenmarkt','thymeandlime','festivalTL','sonstiges'];
+const CATEGORY_ORDER = ['event','wochenmarkt','thymeandlime','festivalTL','sonstiges','abwesenheit'];
 // "muell" bewusst NICHT in CATEGORY_ORDER — diese Termine entstehen nur über
 // den ICS-Import in den Einstellungen, nicht über die normale "Neuer
 // Termin"-Auswahl.
-const CATEGORY_LABELS = {event:'Event', wochenmarkt:'Wochenmarkt', thymeandlime:'Streetfood', festivalTL:'Festivals & Wochenmärkte (Streetfood)', sonstiges:'Sonstiges', muell:'Müllabfuhr'};
-const CATEGORY_COLORS = {event:'#8f1d33', wochenmarkt:'#2e5e8f', thymeandlime:'#3d6b4a', festivalTL:'#6b8f3d', sonstiges:'#b5872e', muell:'#5a5651'};
+const CATEGORY_LABELS = {event:'Event', wochenmarkt:'Wochenmarkt', thymeandlime:'Streetfood', festivalTL:'Festivals & Wochenmärkte (Streetfood)', sonstiges:'Sonstiges', abwesenheit:'Urlaub/Abwesenheit', muell:'Müllabfuhr'};
+const CATEGORY_COLORS = {event:'#8f1d33', wochenmarkt:'#2e5e8f', thymeandlime:'#3d6b4a', festivalTL:'#6b8f3d', sonstiges:'#b5872e', abwesenheit:'#635a8f', muell:'#5a5651'};
+// Arten von Abwesenheit — bestimmen die Vorbelegung des Website-Tags
+// (Urlaub -> "Urlaub", alles andere -> "Ausfall").
+const ABSENCE_ARTS = ['Urlaub','Krankheit','Markt fällt aus','Sonstiges'];
+
+// Termine an einem Tag — inklusive Zeitraum-Terminen (dateBis gesetzt, z. B.
+// Urlaub von–bis): die erscheinen an JEDEM Tag des Zeitraums im Kalender.
+function eventsForDay(iso){
+  return state.events.filter(e => e.date===iso || (e.date && e.dateBis && e.date<=iso && iso<=e.dateBis));
+}
 
 // Abo-Kalender-Link (Apple/Samsung/Google Kalender).
 // Früher stand hier ein fester, für alle gleicher Schlüssel — der lag damit im
@@ -1330,6 +1339,9 @@ let state = {
   // am Kernlisten-Automatismus.
   inventoryLists: {},   // id -> {id, name, items:[{id,category,name}], updatedAt}
   invOpenListId: null,  // welche Liste im Inventar-Reiter gerade aufgeklappt ist
+  // Marktstand-Status pro Website-Standort (website/marktstatus_<slug>):
+  // pausiert -> die Website zeigt statt des Speiseplans den Hinweistext.
+  marktstatus: {},      // slug -> {pausiert, hinweis}
   invAdminOpen: false, // Kernliste-Verwaltung in den Einstellungen ein-/ausgeklappt
   newInvItemName: '', newInvItemCategory: 'geraete',
   newAblaufText: ''
@@ -1348,7 +1360,7 @@ function getDishConfigForCategory(cat){
 }
 
 /* ============================= FIRESTORE-SYNC & LOGIN ============================= */
-let unsubEvents=null, unsubCustom=[], unsubCustomTL=[], unsubMeta=null, unsubSettings=null, unsubRecipes=null, unsubManualHours=null, unsubInventoryCore=null, unsubInventoryLists=null;
+let unsubEvents=null, unsubCustom=[], unsubCustomTL=[], unsubMeta=null, unsubSettings=null, unsubRecipes=null, unsubManualHours=null, unsubInventoryCore=null, unsubInventoryLists=null, unsubMarktstatus=[];
 const CUSTOM_CATS = ['curry','andereReis','nudeln','vorspeisen','desserts'];
 const CUSTOM_CATS_TL = ['vorspeisen','hauptspeisen','desserts','snacks','streetfood','getraenke'];
 
@@ -1389,6 +1401,14 @@ function startFirestoreSync(){
     state.inventoryLists = lists;
     render();
   }, err=>{ console.error('Firestore-Fehler (inventoryLists):', err); handleFirestoreError(err); });
+
+  Object.values(WEBSITE_ORT_SLUGS).forEach(slug=>{
+    const unsub = onSnapshot(doc(db,'website','marktstatus_'+slug), d=>{
+      state.marktstatus[slug] = d.exists() ? d.data() : { pausiert:false, hinweis:'' };
+      render();
+    }, err=>{ console.error('Firestore-Fehler (marktstatus/'+slug+'):', err); handleFirestoreError(err); });
+    unsubMarktstatus.push(unsub);
+  });
 
   CUSTOM_CATS.forEach(catKey=>{
     const unsub = onSnapshot(doc(db,'customDishes',catKey), d=>{
@@ -1445,6 +1465,8 @@ function stopFirestoreSync(){
   unsubCustomTL=[];
   if(unsubRecipes) unsubRecipes();
   if(unsubInventoryLists) unsubInventoryLists();
+  unsubMarktstatus.forEach(u=>u());
+  unsubMarktstatus=[];
   if(unsubManualHours) unsubManualHours();
   if(unsubInventoryCore) unsubInventoryCore();
 }
@@ -1530,13 +1552,16 @@ async function syncNewsDocForEvent(event){
   if(event.showAsNews && text){
     const data = {
       type: 'news',
-      titel: event.anlass || '',
+      titel: event.anlass || (event.category==='abwesenheit' ? (event.absenceArt||'Urlaub') : ''),
       text,
       datumVon: event.date || '',
-      tag: WEBSITE_NEWS_TAGS.includes(event.publicTag) ? event.publicTag : 'Event',
+      tag: WEBSITE_NEWS_TAGS.includes(event.publicTag) ? event.publicTag : defaultNewsTag(event),
       updatedAt: serverTimestamp()
     };
+    // Zeitraum: explizites "Bis (optional)" gewinnt; bei Abwesenheiten
+    // (Urlaub von–bis) sonst automatisch das Bis-Datum des Termins.
     if(event.publicDatumBis) data.datumBis = event.publicDatumBis;
+    else if(event.dateBis && event.dateBis !== event.date) data.datumBis = event.dateBis;
     if(event.publicImage) data.bild = event.publicImage;
     await setDoc(doc(db,'website',docId), data);
   } else {
@@ -1576,7 +1601,7 @@ async function syncWebsiteForEvent(event){
           await setDoc(doc(db,'events',event.id), { _websiteDocId: null }, {merge:true}).catch(e=>console.warn('Nebenaufgabe fehlgeschlagen (index):', e));
         }
       }
-    } else if(event.category==='event' || event.category==='sonstiges'){
+    } else if(event.category==='event' || event.category==='sonstiges' || event.category==='abwesenheit'){
       await syncNewsDocForEvent(event);
     }
   }catch(e){
@@ -1595,7 +1620,7 @@ async function clearWebsiteForEvent(event){
         await deleteDoc(doc(db,'website',event._websiteDocId)).catch(e=>console.warn('Nebenaufgabe fehlgeschlagen (index):', e));
       }
       await deleteDoc(doc(db,'website','news_'+event.id)).catch(e=>console.warn('Nebenaufgabe fehlgeschlagen (index):', e));
-    } else if(event.category==='event' || event.category==='sonstiges'){
+    } else if(event.category==='event' || event.category==='sonstiges' || event.category==='abwesenheit'){
       await deleteDoc(doc(db,'website','news_'+event.id)).catch(e=>console.warn('Nebenaufgabe fehlgeschlagen (index):', e));
     }
   }catch(e){ console.error('Website-Cleanup-Fehler:', e); }
@@ -1663,6 +1688,24 @@ async function saveInventoryListDoc(list){
 async function deleteInventoryListDoc(id){
   try{ await deleteDoc(doc(db,'inventoryLists',id)); }
   catch(e){ console.error('Fehler beim Löschen der Inventarliste:', e); markStorageIssue(); }
+}
+// Marktstand-Status pro Website-Standort schreiben (öffentlich lesbar,
+// die Website zeigt bei pausiert den Hinweis statt des Speiseplans).
+async function saveMarktstatusDoc(slug, ort, pausiert, hinweis){
+  try{
+    await setDoc(doc(db,'website','marktstatus_'+slug), {
+      type: 'marktstatus',
+      ort,
+      pausiert: !!pausiert,
+      hinweis: (hinweis||'').trim(),
+      updatedAt: serverTimestamp()
+    });
+    showToast('Marktstand-Status für '+ort+' gespeichert ✓', false);
+  }catch(e){
+    console.error('Fehler beim Speichern des Marktstand-Status:', e);
+    markStorageIssue();
+    showToast('Marktstand-Status NICHT gespeichert: '+(e.message||e), true);
+  }
 }
 // Ordnet eine gespeicherte Liste einem Termin zu: ersetzt dessen komplette
 // Inventarliste (Häkchen starten frisch). Schreibt nur das inventory-Feld
@@ -1985,7 +2028,7 @@ function renderKalenderTab(){
   for(let i=0;i<firstDow;i++) cells += `<div class="day empty"></div>`;
   for(let d=1; d<=daysInMonth; d++){
     const iso = isoDate(y,m,d);
-    const dayEvents = state.events.filter(e=>e.date===iso).sort((a,b)=>(a.anlass||'').localeCompare(b.anlass||''));
+    const dayEvents = eventsForDay(iso).sort((a,b)=>(a.anlass||'').localeCompare(b.anlass||''));
     const isToday = iso===todayISO();
     let chips = dayEvents.slice(0,2).map(e=>`<div class="evt-chip" style="background:${CATEGORY_COLORS[e.category||'event']};">${escapeHtml(e.anlass||'Termin')}</div>`).join('');
     if(dayEvents.length>2) chips += `<div class="evt-more">+${dayEvents.length-2} weitere</div>`;
@@ -2015,7 +2058,7 @@ function renderKalenderTab(){
 
 function renderDayPanel(iso){
   const [y,m,d] = iso.split('-').map(Number);
-  const dayEvents = state.events.filter(e=>e.date===iso);
+  const dayEvents = eventsForDay(iso);
   const dateLabel = new Date(y,m-1,d).toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
   return `
   <div class="panel">
@@ -2036,6 +2079,10 @@ function renderEventRow(e){
   let meta = '';
   if(cat==='sonstiges'){
     meta = `${escapeHtml(e.anlass||'—')} · ${escapeHtml(String(e.people||'—'))}${e.sonstOrt?' · '+escapeHtml(e.sonstOrt):''}${e.sonstWie?' · '+escapeHtml(e.sonstWie):''}`;
+  } else if(cat==='abwesenheit'){
+    const von = e.date ? new Date(e.date+'T00:00:00').toLocaleDateString('de-DE') : '—';
+    const bis = e.dateBis ? new Date(e.dateBis+'T00:00:00').toLocaleDateString('de-DE') : von;
+    meta = `${escapeHtml(e.absenceArt||'Urlaub')} · ${von}${bis!==von ? ' – '+bis : ''}${e.showAsNews ? ' · 🌐 auf Website' : ''}`;
   } else if(cat==='wochenmarkt' || cat==='festivalTL'){
     meta = `${(e.dishes||[]).length} Gerichte${e.address?' · '+escapeHtml(e.address):''}`;
   } else {
@@ -2095,6 +2142,7 @@ function renderEventModal(){
         </div>
 
         ${cat==='sonstiges' ? renderSonstigesFields(e) : ''}
+        ${cat==='abwesenheit' ? renderAbwesenheitFields(e) : ''}
         ${(cat==='wochenmarkt'||cat==='festivalTL') ? renderWochenmarktFields(e) : ''}
         ${(cat==='event'||cat==='thymeandlime') ? renderEventLikeFields(e) : ''}
         ${renderTeamSection(e)}
@@ -2136,6 +2184,13 @@ function renderTeamSection(e){
   `;
 }
 
+// Standard-Tag für die Website-News: Abwesenheiten werden je nach Art als
+// "Urlaub" oder "Ausfall" vorbelegt, alles andere als "Event".
+function defaultNewsTag(e){
+  if(e.category==='abwesenheit') return (e.absenceArt||'Urlaub')==='Urlaub' ? 'Urlaub' : 'Ausfall';
+  return 'Event';
+}
+
 // Öffentliche News-Felder für die Website — bei Kategorie "Event", "Sonstiges"
 // und "Wochenmarkt" verfügbar (siehe renderEventLikeFields/renderSonstigesFields/
 // renderWochenmarktFields). Inklusive optionalem Veranstaltungsposter, das als
@@ -2149,10 +2204,10 @@ function renderNewsFields(e){
       </label>
     </div>
     ${e.showAsNews ? `
-    <div class="field"><label>Öffentlicher Text</label><textarea id="f-news-text" rows="2" placeholder="z. B. Wir sind bei den Illertisser Gartentagen dabei">${escapeHtml(e.publicText||'')}</textarea></div>
+    <div class="field"><label>Öffentlicher Text</label><textarea id="f-news-text" rows="2" placeholder="${e.category==='abwesenheit' ? 'z. B. Wir machen Sommerpause — ab dem 14.09. sind wir wieder für euch da!' : 'z. B. Wir sind bei den Illertisser Gartentagen dabei'}">${escapeHtml(e.publicText||'')}</textarea></div>
     <div class="field-row">
       <div class="field"><label>Art</label>
-        <select id="f-news-tag">${WEBSITE_NEWS_TAGS.map(t=>`<option value="${t}" ${(e.publicTag||'Event')===t?'selected':''}>${t}</option>`).join('')}</select>
+        <select id="f-news-tag">${WEBSITE_NEWS_TAGS.map(t=>`<option value="${t}" ${(e.publicTag || defaultNewsTag(e))===t?'selected':''}>${t}</option>`).join('')}</select>
       </div>
       <div class="field"><label>Bis (optional)</label><input type="date" id="f-news-bis" value="${e.publicDatumBis||''}"></div>
     </div>
@@ -2183,6 +2238,29 @@ function renderSonstigesFields(e){
     </div>
     <div class="field"><label>Notizen</label><textarea id="f-notes" rows="3">${escapeHtml(e.notes||'')}</textarea></div>
     ${renderNewsFields(e)}
+  `;
+}
+
+/* Urlaub/Krankheit/Marktausfall als Zeitraum: markiert im Kalender jeden Tag
+   von "Von" bis "Bis" und kann als News (mit Zeitraum) auf der Website
+   erscheinen. Für den Vermerk "statt Speiseplan" am einzelnen Markt-Standort
+   gibt es zusätzlich den Marktstand-Status in den Einstellungen. */
+function renderAbwesenheitFields(e){
+  return `
+    <div class="field"><label>Bezeichnung</label><input type="text" id="f-anlass" value="${escapeHtml(e.anlass)}" placeholder="z. B. Sommerurlaub"></div>
+    <div class="field">
+      <label>Art</label>
+      <div class="pill-select" id="f-absence-art">
+        ${ABSENCE_ARTS.map(a=>`<div class="pill ${(e.absenceArt||'Urlaub')===a?'selected':''}" data-absence-art="${a}">${a}</div>`).join('')}
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Von</label><input type="date" id="f-date" value="${e.date}"></div>
+      <div class="field"><label>Bis</label><input type="date" id="f-date-bis" value="${e.dateBis||e.date||''}"></div>
+    </div>
+    <div class="field"><label>Notizen (optional)</label><textarea id="f-notes" rows="2">${escapeHtml(e.notes||'')}</textarea></div>
+    ${renderNewsFields(e)}
+    <div class="hint">Mit „Als News auf Website zeigen" steht der Zeitraum automatisch unter „Aktuelles" auf der Website. Soll an einem Markt-Standort statt des Speiseplans ein Hinweis stehen (z. B. „Markt fällt aus"), zusätzlich in den Einstellungen den Marktstand-Status umschalten.</div>
   `;
 }
 
@@ -2471,6 +2549,27 @@ function renderEinstellungenTab(){
     <button type="button" class="btn gold sm" data-tab="inventar">📋 Zum Inventar-Reiter</button>
   </div>
   <div class="panel">
+    <h3>Marktstand-Status (Website)</h3>
+    <p class="hint" style="margin-bottom:12px;">Pro Standort umschaltbar: Normal zeigt die Website den Speiseplan. „Pausiert" zeigt stattdessen den Hinweistext — z. B. wenn ein Markt gerade nicht stattfindet oder ihr dort zurzeit nicht steht.</p>
+    ${Object.entries(WEBSITE_ORT_SLUGS).map(([ort, slug])=>{
+      const ms = state.marktstatus[slug] || { pausiert:false, hinweis:'' };
+      return `
+      <div style="border:1px solid ${ms.pausiert ? 'var(--gold)' : 'rgba(255,255,255,0.12)'};border-radius:10px;padding:10px 12px;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+          <b>${ort}</b>
+          <button type="button" class="btn ${ms.pausiert?'gold':'ghost'} sm" data-markt-toggle="${slug}" data-markt-ort="${ort}">
+            ${ms.pausiert ? '⏸ Pausiert — Hinweis statt Speiseplan' : '▶︎ Normal — Speiseplan wird gezeigt'}
+          </button>
+        </div>
+        ${ms.pausiert ? `
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+          <input type="text" data-markt-hinweis="${slug}" value="${escapeHtml(ms.hinweis||'')}" placeholder="z. B. Zurzeit sind wir nicht auf dem Wochenmarkt ${ort} — wir informieren euch hier, sobald es weitergeht." style="flex:1;min-width:220px;">
+          <button type="button" class="btn ghost sm" data-markt-save="${slug}" data-markt-ort="${ort}">Hinweis speichern</button>
+        </div>` : ''}
+      </div>`;
+    }).join('')}
+  </div>
+  <div class="panel">
     <h3>Google Kalender</h3>
     <p class="hint" style="margin-bottom:12px;">Verbinde deinen echten Google Kalender — dann kannst du einzelne Termine dorthin senden. Der Termin erscheint dort mit einem Link zurück in diese App (praktisch z. B. für Google-Kalender-Widgets auf dem Homescreen).</p>
     <button type="button" class="btn ghost sm" id="connectGcalBtn">${gcalAccessToken ? 'Erneut verbinden' : 'Mit Google Kalender verbinden'}</button>
@@ -2648,6 +2747,13 @@ function attachGlobalHandlers(){
       state.editingEvent.art = p.dataset.art; render();
     });
 
+    const absenceArtWrap = document.getElementById('f-absence-art');
+    if(absenceArtWrap) absenceArtWrap.querySelectorAll('.pill').forEach(p=>p.onclick=()=>{
+      state.editingEvent.absenceArt = p.dataset.absenceArt; render();
+    });
+    const dateBisEl = document.getElementById('f-date-bis');
+    if(dateBisEl) dateBisEl.oninput = ()=>{ state.editingEvent.dateBis = dateBisEl.value; };
+
     const nebenWrap = document.getElementById('f-neben');
     if(nebenWrap) nebenWrap.querySelectorAll('.pill').forEach(p=>p.onclick=()=>{
       const v = p.dataset.neben;
@@ -2748,6 +2854,14 @@ function attachGlobalHandlers(){
       const val = (id)=>{ const el=document.getElementById(id); return el ? el.value : undefined; };
       if(val('f-anlass')!==undefined) e.anlass = val('f-anlass').trim();
       if(val('f-date')) e.date = val('f-date');
+      if(val('f-date-bis')!==undefined){
+        e.dateBis = val('f-date-bis') || null;
+        // "Bis" darf nicht vor "Von" liegen — sonst still auf "Von" setzen.
+        if(e.dateBis && e.date && e.dateBis < e.date) e.dateBis = e.date;
+        // Bezeichnung für Abwesenheiten vorbelegen, damit Kalender-Chip und
+        // Website-Titel nie leer sind.
+        if((e.category||'')==='abwesenheit' && !e.anlass) e.anlass = e.absenceArt || 'Urlaub';
+      }
       if(val('f-people')!==undefined) e.people = val('f-people');
       if(val('f-contact')!==undefined) e.contactName = val('f-contact').trim();
       if(val('f-email')!==undefined) e.email = val('f-email').trim();
@@ -3024,6 +3138,28 @@ function attachGlobalHandlers(){
     if(!list) return;
     list.items = (list.items||[]).filter(it=>it.id!==itemId);
     saveInventoryListDoc(list);
+    render();
+  });
+
+  // Marktstand-Status (Einstellungen): Toggle + Hinweistext pro Standort.
+  document.querySelectorAll('[data-markt-toggle]').forEach(btn=>btn.onclick=()=>{
+    const slug = btn.dataset.marktToggle;
+    const ort = btn.dataset.marktOrt;
+    const ms = state.marktstatus[slug] || { pausiert:false, hinweis:'' };
+    const neuPausiert = !ms.pausiert;
+    if(neuPausiert && !confirm('Speiseplan für '+ort+' auf der Website durch einen Hinweis ersetzen?')) return;
+    state.marktstatus[slug] = { ...ms, pausiert: neuPausiert };
+    saveMarktstatusDoc(slug, ort, neuPausiert, ms.hinweis);
+    render();
+  });
+  document.querySelectorAll('[data-markt-save]').forEach(btn=>btn.onclick=()=>{
+    const slug = btn.dataset.marktSave;
+    const ort = btn.dataset.marktOrt;
+    const input = document.querySelector(`[data-markt-hinweis="${slug}"]`);
+    const ms = state.marktstatus[slug] || { pausiert:true, hinweis:'' };
+    const hinweis = input ? input.value : ms.hinweis;
+    state.marktstatus[slug] = { ...ms, hinweis };
+    saveMarktstatusDoc(slug, ort, ms.pausiert, hinweis);
     render();
   });
 
