@@ -2,13 +2,21 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <!-- Zoom sperren: feste App-Ansicht statt rein-/rauszoomen. Dreifach, weil
      iOS die Viewport-Angabe allein im Safari-Tab ignoriert:
      1. Viewport-Meta (greift v. a. in der installierten Home-Bildschirm-App)
      2. touch-action: Scrollen erlaubt, Pinch-Zoom nicht (Android/Chrome)
      3. gesturestart abfangen (iOS-Safari-Pinch) -->
-<style>html,body{touch-action:pan-x pan-y;}</style>
+<style>
+/* Feste App-Ansicht auf dem Handy:
+   - touch-action: Scrollen ja, Pinch-Zoom nein
+   - overflow-x: kein seitliches Verrutschen, falls doch mal etwas übersteht
+   - safe-area: Inhalt beginnt unterhalb der iOS-Statusleiste (Uhr/Akku),
+     statt von ihr überlagert zu werden (Home-Bildschirm-App, black-translucent) */
+html,body{touch-action:pan-x pan-y;overflow-x:hidden;}
+body{padding-top:env(safe-area-inset-top,0px);}
+</style>
 <script>
 document.addEventListener('gesturestart', function(e){ e.preventDefault(); }, {passive:false});
 document.addEventListener('gesturechange', function(e){ e.preventDefault(); }, {passive:false});
