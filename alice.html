@@ -2,7 +2,17 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<!-- Zoom sperren: feste App-Ansicht statt rein-/rauszoomen. Dreifach, weil
+     iOS die Viewport-Angabe allein im Safari-Tab ignoriert:
+     1. Viewport-Meta (greift v. a. in der installierten Home-Bildschirm-App)
+     2. touch-action: Scrollen erlaubt, Pinch-Zoom nicht (Android/Chrome)
+     3. gesturestart abfangen (iOS-Safari-Pinch) -->
+<style>html,body{touch-action:pan-x pan-y;}</style>
+<script>
+document.addEventListener('gesturestart', function(e){ e.preventDefault(); }, {passive:false});
+document.addEventListener('gesturechange', function(e){ e.preventDefault(); }, {passive:false});
+</script>
 <title>Red Lotus · Alice (Sekretärin)</title>
 <meta name="theme-color" content="#1c1b1a">
 <meta name="mobile-web-app-capable" content="yes">
