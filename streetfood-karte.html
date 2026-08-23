@@ -58,7 +58,7 @@ button:hover{border-color:var(--gold)}
     <h1>Streetfood-Karte</h1>
     <p class="hint">Pflegt die Wochenkarte auf redlotusstreetfood.com — Dokument <code>website/streetfood_karte</code></p>
   </div>
-  <button id="logout" class="btn-ghost" hidden>Abmelden</button>
+  <span><a href="index.html" style="color:var(--dim);font-size:13px;margin-right:14px;">← Zum Kalender</a><button id="logout" class="btn-ghost" hidden>Abmelden</button></span>
 </div>
 
 <div class="card" id="login">
@@ -94,6 +94,18 @@ button:hover{border-color:var(--gold)}
   <div class="fuss">
     <button class="btn-primary" id="speichern">Auf Website veröffentlichen</button>
     <span class="status" id="status"></span>
+  </div>
+</div>
+
+<div class="card" id="banner-card" hidden>
+  <label for="hinweis-text">Hinweis-Banner auf der Website (z.&nbsp;B. „Heute leider nicht auf dem Markt — bis nächsten Samstag!")</label>
+  <input type="text" id="hinweis-text" maxlength="180" spellcheck="true" autocomplete="off">
+  <div class="fuss">
+    <label style="display:inline-flex;align-items:center;gap:6px;margin:0;text-transform:none;letter-spacing:0;color:var(--dim);font-size:13px;cursor:pointer;">
+      <input type="checkbox" id="hinweis-aktiv" style="accent-color:var(--red-bright);width:15px;height:15px;"> Banner anzeigen
+    </label>
+    <button class="btn-primary" id="hinweis-speichern">Banner speichern</button>
+    <span class="status" id="hinweis-status"></span>
   </div>
 </div>
 
@@ -166,6 +178,30 @@ function archivZeichnen(){
   });
 }
 
+async function hinweisLaden(){
+  try{
+    const snap = await getDoc(doc(db,"website","streetfood_hinweis"));
+    if(snap.exists()){
+      const d = snap.data();
+      $("hinweis-text").value = d.text || "";
+      $("hinweis-aktiv").checked = !!d.aktiv;
+    }
+  }catch(e){ console.warn("Hinweis laden fehlgeschlagen:", e); }
+}
+async function hinweisSpeichern(){
+  const st = $("hinweis-status");
+  st.textContent = "Speichere…"; st.className = "status";
+  try{
+    await setDoc(doc(db,"website","streetfood_hinweis"), {
+      type: "streetfood_hinweis",
+      text: $("hinweis-text").value.trim(),
+      aktiv: $("hinweis-aktiv").checked,
+      updatedAt: serverTimestamp()
+    });
+    st.textContent = $("hinweis-aktiv").checked ? "Banner ist AN ✓" : "Gespeichert — Banner ist aus"; st.className = "status ok";
+  }catch(e){ st.textContent = "Fehlgeschlagen: " + (e.message||e); st.className = "status fehler"; }
+}
+
 async function laden(){
   const s = $("status");
   try{
@@ -220,6 +256,7 @@ async function speichern(){
 }
 
 $("plus").onclick = ()=>$("zeilen").appendChild(zeileHtml());
+$("hinweis-speichern").onclick = hinweisSpeichern;
 $("archiv-plus").onclick = ()=>{
   const k = $("archiv-neu").value.trim().toUpperCase();
   if(!k) return;
@@ -243,8 +280,9 @@ $("logout").onclick = ()=>signOut(auth);
 onAuthStateChanged(auth, user=>{
   $("login").hidden = !!user;
   $("editor").hidden = !user;
+  $("banner-card").hidden = !user;
   $("logout").hidden = !user;
-  if(user) laden();
+  if(user){ laden(); hinweisLaden(); }
 });
 </script>
 </body>
