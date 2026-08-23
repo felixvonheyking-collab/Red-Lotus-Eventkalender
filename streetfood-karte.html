@@ -23,6 +23,8 @@ h1{font-family:Marcellus,Georgia,serif;font-size:22px;color:var(--gold);font-wei
 .card{background:linear-gradient(135deg,var(--ink-2),var(--ink-3));border:1px solid var(--line);border-radius:12px;padding:18px;max-width:760px;margin:0 auto 16px}
 label{display:block;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin:10px 0 4px}
 input[type=text]{width:100%;background:var(--ink);border:1px solid var(--line);border-radius:8px;color:var(--cream);padding:9px 11px;font:inherit}
+textarea{width:100%;background:var(--ink);border:1px solid var(--line);border-radius:8px;color:var(--cream);padding:9px 11px;font:inherit;min-height:70px;resize:vertical}
+#news-vorschau{max-width:220px;border-radius:8px;display:block;margin-top:8px}
 input[type=text]:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--red-bright);outline-offset:2px}
 select{background:var(--ink);border:1px solid var(--line);border-radius:8px;color:var(--cream);padding:9px 8px;font:inherit}
 button{cursor:pointer;font:inherit;border-radius:8px;border:1px solid var(--line);background:var(--ink-3);color:var(--cream);padding:9px 14px}
@@ -106,6 +108,26 @@ button:hover{border-color:var(--gold)}
     </label>
     <button class="btn-primary" id="hinweis-speichern">Banner speichern</button>
     <span class="status" id="hinweis-status"></span>
+  </div>
+</div>
+
+<div class="card" id="news-card" hidden>
+  <label for="news-titel">Aktuelles / Event-Ankündigung — Titel (z.&nbsp;B. „Wir sind beim Stadtfest Biberach!")</label>
+  <input type="text" id="news-titel" maxlength="90" autocomplete="off">
+  <label for="news-text">Beschreibung</label>
+  <textarea id="news-text" maxlength="500" placeholder="Wann, wo, was gibt's — kurz und knackig…"></textarea>
+  <label for="news-bild">Werbeposter (JPG/PNG — wird automatisch verkleinert)</label>
+  <input type="file" id="news-bild" accept="image/*">
+  <img id="news-vorschau" alt="" hidden>
+  <div class="fuss">
+    <button type="button" class="btn-ghost" id="news-bild-weg" hidden>Poster entfernen</button>
+  </div>
+  <div class="fuss">
+    <label style="display:inline-flex;align-items:center;gap:6px;margin:0;text-transform:none;letter-spacing:0;color:var(--dim);font-size:13px;cursor:pointer;">
+      <input type="checkbox" id="news-aktiv" style="accent-color:var(--red-bright);width:15px;height:15px;"> Auf der Website anzeigen
+    </label>
+    <button class="btn-primary" id="news-speichern">Aktuelles speichern</button>
+    <span class="status" id="news-status"></span>
   </div>
 </div>
 
@@ -202,6 +224,55 @@ async function hinweisSpeichern(){
   }catch(e){ st.textContent = "Fehlgeschlagen: " + (e.message||e); st.className = "status fehler"; }
 }
 
+let newsBild = ""; // dataURL des komprimierten Posters
+
+function bildKomprimieren(file){
+  return new Promise((resolve, reject)=>{
+    const img = new Image();
+    img.onload = ()=>{
+      const max = 1000;
+      const f = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width*f); c.height = Math.round(img.height*f);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      resolve(c.toDataURL("image/jpeg", 0.72));
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
+}
+async function newsLaden(){
+  try{
+    const snap = await getDoc(doc(db,"website","streetfood_news"));
+    if(snap.exists()){
+      const d = snap.data();
+      $("news-titel").value = d.titel || "";
+      $("news-text").value = d.text || "";
+      $("news-aktiv").checked = !!d.aktiv;
+      newsBild = d.bild || "";
+      $("news-vorschau").src = newsBild || "";
+      $("news-vorschau").hidden = !newsBild;
+      $("news-bild-weg").hidden = !newsBild;
+    }
+  }catch(e){ console.warn("Aktuelles laden fehlgeschlagen:", e); }
+}
+async function newsSpeichern(){
+  const st = $("news-status");
+  if(newsBild.length > 900000){ st.textContent = "Poster ist trotz Kompression zu groß — bitte kleineres Bild wählen."; st.className="status fehler"; return; }
+  st.textContent = "Speichere…"; st.className = "status";
+  try{
+    await setDoc(doc(db,"website","streetfood_news"), {
+      type: "streetfood_news",
+      titel: $("news-titel").value.trim(),
+      text: $("news-text").value.trim(),
+      bild: newsBild,
+      aktiv: $("news-aktiv").checked,
+      updatedAt: serverTimestamp()
+    });
+    st.textContent = $("news-aktiv").checked ? "Auf der Website ✓" : "Gespeichert — aktuell ausgeblendet"; st.className = "status ok";
+  }catch(e){ st.textContent = "Fehlgeschlagen: " + (e.message||e); st.className = "status fehler"; }
+}
+
 async function laden(){
   const s = $("status");
   try{
@@ -257,6 +328,21 @@ async function speichern(){
 
 $("plus").onclick = ()=>$("zeilen").appendChild(zeileHtml());
 $("hinweis-speichern").onclick = hinweisSpeichern;
+$("news-speichern").onclick = newsSpeichern;
+$("news-bild").addEventListener("change", async e=>{
+  const f = e.target.files && e.target.files[0];
+  if(!f) return;
+  const st = $("news-status"); st.textContent = "Verkleinere Poster…"; st.className = "status";
+  try{
+    newsBild = await bildKomprimieren(f);
+    $("news-vorschau").src = newsBild; $("news-vorschau").hidden = false;
+    $("news-bild-weg").hidden = false;
+    st.textContent = "Poster bereit (" + Math.round(newsBild.length/1024*0.75) + " KB) — noch speichern!";
+  }catch(err){ st.textContent = "Bild konnte nicht gelesen werden."; st.className = "status fehler"; }
+});
+$("news-bild-weg").onclick = ()=>{
+  newsBild = ""; $("news-vorschau").hidden = true; $("news-bild-weg").hidden = true; $("news-bild").value = "";
+};
 $("archiv-plus").onclick = ()=>{
   const k = $("archiv-neu").value.trim().toUpperCase();
   if(!k) return;
@@ -281,8 +367,9 @@ onAuthStateChanged(auth, user=>{
   $("login").hidden = !!user;
   $("editor").hidden = !user;
   $("banner-card").hidden = !user;
+  $("news-card").hidden = !user;
   $("logout").hidden = !user;
-  if(user){ laden(); hinweisLaden(); }
+  if(user){ laden(); hinweisLaden(); newsLaden(); }
 });
 </script>
 </body>
