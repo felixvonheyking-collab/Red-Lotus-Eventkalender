@@ -282,6 +282,49 @@ button.link-chip.active{background:var(--gold);color:var(--ink);border-color:var
   padding:10px 12px;border-radius:9px;font-size:14px;font-family:'Work Sans',sans-serif;min-width:0;
 }
 
+/* Spürbares Tastgefühl: jeder Button drückt sich sichtbar ein — zusätzlich
+   zur Vibration (Android) und zum Klickton beim Hinzufügen. */
+button:active{transform:scale(0.96);}
+
+/* "Gesamte Bestellung anzeigen": Button im Fuß + Vollbild-Übersicht */
+.order-overview-btn{
+  width:100%;background:var(--ink);border:1px solid var(--line);color:var(--cream);
+  padding:10px;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;
+  font-family:'Work Sans',sans-serif;margin-bottom:8px;
+}
+.order-overview-btn:disabled{opacity:0.35;}
+.order-overlay{
+  position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.75);
+  display:flex;align-items:center;justify-content:center;padding:18px;
+}
+.order-overlay-panel{
+  background:var(--ink-2);border:1px solid var(--gold);border-radius:14px;
+  width:100%;max-width:560px;max-height:88vh;display:flex;flex-direction:column;
+  box-shadow:var(--shadow);
+}
+.order-overlay-head{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:14px 16px;border-bottom:1px solid var(--line);
+  font-family:'Marcellus',serif;font-size:17px;color:var(--gold-soft);
+}
+.order-overlay-head button{
+  background:var(--ink-3);border:1px solid var(--line);color:var(--cream);
+  padding:9px 14px;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;
+  font-family:'Work Sans',sans-serif;
+}
+.order-overlay-list{flex:1;overflow-y:auto;padding:10px 16px;display:flex;flex-direction:column;gap:6px;}
+.order-overlay-row{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:9px 10px;background:var(--ink);border:1px solid var(--line);border-radius:9px;
+  font-size:15px;
+}
+.order-overlay-row.wish{border-color:var(--warn);background:rgba(201,121,62,0.14);font-weight:700;}
+.order-overlay-total{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:14px 16px;border-top:1px solid var(--line);font-size:15px;
+}
+.order-overlay-total b{font-size:24px;color:var(--gold-soft);}
+
 /* Katalog verwalten (Gerichte/Specials hinzufügen, Preise ändern) */
 .katalog-list{display:flex;flex-direction:column;gap:6px;margin:10px 0;}
 .katalog-row{
@@ -754,14 +797,13 @@ function allCatalogItemsFrom(catalog){
 }
 
 /* ============================= TAGESAUSWAHL (Bausteine) =============================
-   Vor Betriebsbeginn wählt Felix aus dem Katalog der aktuellen Marke bis
-   zu 6 HAUPTGERICHTE für den Tag aus (in "⚙ Tagesauswahl"). Gerichte mit
-   counted:false (Salat, Suppe, Specials, …) sind ebenfalls dort
-   an-/abschaltbar, zählen aber NICHT gegen die 6er-Grenze. Die Größe
-   (Normal/Klein) zählt bei normalen Gerichten ebenfalls nicht extra mit —
-   ist ein Gericht aktiv, stehen beide Größen automatisch als Buttons zur
-   Verfügung. Auswahl wird pro Marke und Gerät in localStorage gemerkt. */
-const MAX_ACTIVE_BAUSTEINE = 6;
+   Vor Betriebsbeginn wählt Felix aus dem Katalog der aktuellen Marke die
+   heutigen Gerichte aus (in "⚙ Tagesauswahl") — ohne Obergrenze. counted
+   unterscheidet nur noch Hauptgerichte von Extra-Gerichten (Salat, Suppe, …)
+   für die Gruppierung und die Zähler-Anzeige. Die Größe (Normal/Klein)
+   gehört automatisch zusammen — ist ein Gericht aktiv, stehen beide Größen
+   als Buttons zur Verfügung. Auswahl wird pro Marke und Gerät in
+   localStorage gemerkt. */
 function countedActiveCount(ids){
   const items = allCatalogItemsFrom(state.catalog);
   return ids.filter(id => {
@@ -841,9 +883,8 @@ let state = {
   prices: loadPrices(), // feste Preis-Buttons, im Browser auf diesem Gerät gespeichert
   editMode: false,      // "Preise verwalten"-Modus (Buttons löschen / neue hinzufügen)
   newPriceEntry: '',     // Eingabe fürs Hinzufügen eines neuen Preis-Buttons
-  showCustomEntry: false, // "Individueller Betrag"-Tastatur ein-/ausgeklappt
   items: [],        // [{id, price, label}]
-  entry: '',         // individuelle Betrags-Eingabe (falls Preis nicht in der Liste ist)
+  showOrderOverlay: false, // Vollbild-Übersicht "Gesamte Bestellung anzeigen"
   paidEntry: '',      // aktuell eingetippter "Bezahlt mit"-Betrag
   paid: null,          // bestätigter "bezahlt mit"-Betrag (per Schnellwahl-Button)
 
@@ -976,48 +1017,62 @@ function renderDishQuickGrid(){
     return `<div class="dish-col"><div class="dish-col-title">${escapeHtmlPR(col.title)}</div>${buttons}</div>`;
   }).join('');
 
-  const customEntryHtml = `
-    <div class="manage-row" style="justify-content:flex-start;margin-top:12px;">
-      <button type="button" id="toggleCustomBtn">${state.showCustomEntry ? '✕ Individuellen Betrag schließen' : '+ Individueller Betrag'}</button>
-    </div>
-    ${state.showCustomEntry ? `
-    <div class="keypad-display"><span class="euro">€</span>${state.entry || '0'}</div>
-    <div class="keypad">
-      ${['7','8','9','4','5','6','1','2','3'].map(n=>`<button type="button" data-key="${n}">${n}</button>`).join('')}
-      <button type="button" data-key="0">0</button>
-      <button type="button" data-key=",">,</button>
-      <button type="button" class="clear" data-key="clear">⌫</button>
-      <button type="button" class="add" data-key="add">Hinzufügen</button>
-    </div>` : ''}`;
-
-  return (cols.length
+  return cols.length
     ? `<div class="dish-cols">${colHtml}</div>`
-    : `<div class="empty-state">Noch keine Gerichte für heute ausgewählt. Auf den Reiter „⚙ Tagesauswahl" tippen und bis zu ${MAX_ACTIVE_BAUSTEINE} Hauptgerichte festlegen.</div>`)
-    + customEntryHtml;
+    : `<div class="empty-state">Noch keine Gerichte für heute ausgewählt. Auf den Reiter „⚙ Tagesauswahl" tippen und die heutigen Gerichte festlegen.</div>`;
 }
 
 /* ============================= RENDER: TAGESAUSWAHL =============================
-   Marke wählen, heutige Gerichte auswählen (bis zu 6 Hauptgerichte),
+   Marke wählen, heutige Gerichte auswählen,
    Namen/Preise anpassen, neue Gerichte/Specials anlegen, welche löschen —
    als Reiter "⚙ Tagesauswahl" (siehe renderTagesauswahlTab). */
 function renderAuswahlTab(){
-  const items = allCatalogItemsFrom(state.catalog);
   const countedCount = countedActiveCount(state.activeBausteinIds);
+
+  // Gleiche Ordnung wie im Gerichte-Reiter: eine Spalte pro Gericht, darin
+  // die Varianten. Getrennte Abschnitte für Hauptgerichte, Extra-Gerichte
+  // und Specials — statt einem einzigen langen Raster.
+  const buildCols = (list, type) => {
+    const cols = [];
+    const colByKey = {};
+    list.forEach(b=>{
+      const key = b.group || b.id;
+      if(!colByKey[key]){
+        const title = b.group && b.name.includes(' – ') ? b.name.split(' – ')[0] : b.name;
+        colByKey[key] = { title, entries: [] };
+        cols.push(colByKey[key]);
+      }
+      colByKey[key].entries.push({ ...b, type });
+    });
+    return cols.map(col=>`
+      <div class="dish-col">
+        <div class="dish-col-title">${escapeHtmlPR(col.title)}</div>
+        ${col.entries.map(b=>{
+          const on = state.activeBausteinIds.includes(b.id);
+          const label = (b.group && b.name.includes(' – ')) ? b.name.split(' – ').slice(1).join(' – ') : b.name;
+          const priceLine = (b.type === 'single' || b.kleinPrice == null) ? fmtEUR(b.price) : `${fmtEUR(b.price)} / ${fmtEUR(b.kleinPrice)} (Klein)`;
+          return `
+          <div class="dish-cell">
+            <button type="button" class="dish-btn ${dishTagClass(b.name)} ${dishProteinBorderClass(b.name)} ${on?'active-baustein':''}" data-toggle-baustein="${b.id}">${on?'✓ ':''}${escapeHtmlPR(label)}<br><b>${priceLine}</b></button>
+            <button type="button" class="mine-star ${b.mine?'active':''}" data-toggle-mine="${b.id}" title="Zu „Meine Posten" zählen">⭐</button>
+          </div>`;
+        }).join('')}
+      </div>`).join('');
+  };
+
+  const mains = state.catalog.dishes.filter(d=>d.counted);
+  const extras = state.catalog.dishes.filter(d=>!d.counted);
+  const specials = state.catalog.specials;
+
+  if(!mains.length && !extras.length && !specials.length){
+    return '<div class="empty-state">Noch kein Katalog für diese Marke — unter „🛠 Katalog" Gerichte anlegen.</div>';
+  }
+
   return `
-    <div class="hint" style="margin-bottom:10px;">Bis zu ${MAX_ACTIVE_BAUSTEINE} Hauptgerichte für heute auswählen (${countedCount}/${MAX_ACTIVE_BAUSTEINE}). Normal &amp; Klein zählen zusammen als 1 Gericht. Extra-Gerichte (·extra) und Specials zählen nicht mit — immer zusätzlich schaltbar. Neue Gerichte/Specials unter „🛠 Katalog" anlegen.</div>
-    <div class="hint" style="margin-bottom:10px;">⭐ oben rechts an einem Gericht markiert es als „Meine Posten" — diese Gerichte tauchen dann bei Bestellungen rechts in der Liste „Meine Posten" auf, unabhängig davon, welche Gerichte gerade aktiv sind.</div>
-    <div class="dish-grid">
-      ${items.map(b=>{
-        const on = state.activeBausteinIds.includes(b.id);
-        const priceLine = (b.type === 'single' || b.kleinPrice == null) ? fmtEUR(b.price) : `${fmtEUR(b.price)} / ${fmtEUR(b.kleinPrice)} <b>(Klein)</b>`;
-        const extraTag = b.counted ? '' : ' · extra';
-        return `
-        <div class="dish-cell">
-          <button type="button" class="dish-btn ${dishTagClass(b.name)} ${dishProteinBorderClass(b.name)} ${on?'active-baustein':''}" data-toggle-baustein="${b.id}">${escapeHtmlPR(b.name)}${extraTag}<br><b>${priceLine}</b></button>
-          <button type="button" class="mine-star ${b.mine?'active':''}" data-toggle-mine="${b.id}" title="Zu „Meine Posten" zählen">⭐</button>
-        </div>`;
-      }).join('') || '<div class="empty-state">Noch kein Katalog für diese Marke — unter „🛠 Katalog" Gerichte anlegen.</div>'}
-    </div>
+    <div class="hint" style="margin-bottom:10px;">Antippen = heute im Gerichte-Reiter verfügbar (goldene Markierung, aktuell ${countedCount} Hauptgericht${countedCount===1?'':'e'} aktiv). Normal &amp; Klein gehören automatisch zusammen. ⭐ markiert ein Gericht für die Liste „Meine Posten". Neue Gerichte/Specials unter „🛠 Katalog" anlegen.</div>
+    ${mains.length ? `<div class="sub-title">Hauptgerichte</div><div class="dish-cols" style="margin-bottom:14px;">${buildCols(mains,'dish')}</div>` : ''}
+    ${extras.length ? `<div class="sub-title">Extra-Gerichte</div><div class="dish-cols" style="margin-bottom:14px;">${buildCols(extras,'dish')}</div>` : ''}
+    ${specials.length ? `<div class="sub-title">Specials (Getränke/Desserts)</div><div class="dish-cols">${buildCols(specials,'single')}</div>` : ''}
   `;
 }
 function renderKatalogTab(){
@@ -1041,7 +1096,7 @@ function renderKatalogTab(){
         <input type="text" inputmode="decimal" id="newDishKlein" placeholder="Klein (optional)" value="${state.newDishKlein}">
       </div>
       <label class="hint" style="display:flex;align-items:center;gap:6px;margin-top:8px;">
-        <input type="checkbox" id="newDishCounted" ${state.newDishCounted?'checked':''}> Zählt zu den 6 Hauptgerichten
+        <input type="checkbox" id="newDishCounted" ${state.newDishCounted?'checked':''}> Hauptgericht (sonst Extra-Gericht wie Salat/Suppe)
       </label>
       <button type="button" id="addDishBtn" class="btn ghost" style="margin-top:8px;">+ Gericht hinzufügen</button>
     </div>
@@ -1127,6 +1182,16 @@ function render(){
   const paidAmount = state.paid !== null ? state.paid : parseEntry(state.paidEntry);
   const change = paidAmount - t;
 
+  // Scroll-Position und Fokus über das Neuzeichnen retten — sonst springt
+  // die Bestell-Liste nach jedem Tipp (z. B. "Box?") wieder nach oben.
+  const oldScrollEl = app.querySelector('.order-scroll');
+  const savedScroll = oldScrollEl ? oldScrollEl.scrollTop : 0;
+  const savedItemListEl = app.querySelector('.item-list');
+  const savedItemListScroll = savedItemListEl ? savedItemListEl.scrollTop : 0;
+  const savedWinScroll = window.scrollY;
+  const activeId = document.activeElement ? document.activeElement.id : null;
+  const activeSelStart = (document.activeElement && typeof document.activeElement.selectionStart === 'number') ? document.activeElement.selectionStart : null;
+
   app.innerHTML = `
   <div class="panel order-panel">
     <div class="order-scroll">
@@ -1163,6 +1228,10 @@ function render(){
     </div>
 
     <div class="order-footer">
+      <!-- Gesamte Bestellung als Vollbild-Übersicht öffnen -->
+      <button type="button" class="order-overview-btn" id="orderOverviewBtn" ${state.items.length===0 && state.wishes.length===0 ? 'disabled' : ''}>
+        📋 Gesamte Bestellung anzeigen${state.items.length ? ` (${state.items.length} Posten · ${fmtEUR(t)})` : ''}
+      </button>
       <!-- 2. Hier essen oder To-Go (nur eins von beiden) + eigene Box (zusätzlich, unabhängig) -->
       <div class="dine-box-row">
         <button type="button" class="dine-tab ${state.dineMode==='togo'?'active':''}" data-dine-mode="togo">🥡 To-Go</button>
@@ -1187,6 +1256,27 @@ function render(){
       </div>
     </div>
   </div>
+  ${state.showOrderOverlay ? `
+  <div class="order-overlay" id="orderOverlay">
+    <div class="order-overlay-panel">
+      <div class="order-overlay-head">
+        <span>📋 Gesamte Bestellung${state.orderNumber !== null ? ` · #${state.orderNumber}` : ''}</span>
+        <button type="button" id="orderOverlayClose">✕ Schließen</button>
+      </div>
+      <div class="order-overlay-list">
+        ${state.items.length ? state.items.map((it,idx)=>`
+          <div class="order-overlay-row">
+            <span>${it.label ? escapeHtmlPR(it.label) : ('Posten '+(idx+1))}${it.king ? ' <span class="item-king-tag">👑 King Kong</span>' : ''}${it.box==='eigene' ? ' <span class="item-king-tag" style="border-color:var(--line);background:transparent;">🥡 eigene Box</span>' : ''}</span>
+            <b>${fmtEUR(it.price)}</b>
+          </div>`).join('') : '<div class="empty-state">Noch keine Posten.</div>'}
+        ${state.wishes.map(w=>`<div class="order-overlay-row wish"><span>📝 ${escapeHtmlPR(w)}</span></div>`).join('')}
+      </div>
+      <div class="order-overlay-total">
+        <span>${state.dineMode==='hier' ? '🍽️ Hier essen' : '🥡 To-Go'}${state.allEigeneBox ? ' · eigene Box' : ''}${state.isVorbestellung ? ' · 🕒 Vorbestellung' : ''}</span>
+        <b>${fmtEUR(t)}</b>
+      </div>
+    </div>
+  </div>` : ''}
   `;
 
   payPanel.innerHTML = (state.orderNumber !== null && state.isVorbestellung) ? `
@@ -1206,8 +1296,9 @@ function render(){
     </div>
     <div class="keypad-display"><span class="euro">€</span>${state.paidEntry || (state.paid!==null ? state.paid.toLocaleString('de-DE',{minimumFractionDigits:2}) : '0')}</div>
     <div class="cash-shortcuts">
-      ${[5,10,20,50,100].map(v=>`<button type="button" data-paid-quick="${v}">${v} €</button>`).join('')}
+      ${[5,10,20,50,7.60,100].map(v=>`<button type="button" data-paid-quick="${v}">${v.toLocaleString('de-DE',{minimumFractionDigits: v%1?2:0})} €</button>`).join('')}
     </div>
+    <div class="hint" style="margin-bottom:8px;">Mehrfach antippen addiert (2× „5 €" = 10 €). ⌫ setzt zurück.</div>
     <div class="keypad">
       ${['7','8','9','4','5','6','1','2','3'].map(n=>`<button type="button" data-paid-key="${n}">${n}</button>`).join('')}
       <button type="button" data-paid-key="0">0</button>
@@ -1224,36 +1315,55 @@ function render(){
   </div>
   `;
   attachHandlers();
+
+  // Scroll-Position und Fokus wiederherstellen (siehe oben).
+  const newScrollEl = app.querySelector('.order-scroll');
+  if(newScrollEl) newScrollEl.scrollTop = savedScroll;
+  const newItemListEl = app.querySelector('.item-list');
+  if(newItemListEl) newItemListEl.scrollTop = savedItemListScroll;
+  window.scrollTo(0, savedWinScroll);
+  if(activeId){
+    const el = document.getElementById(activeId);
+    if(el && typeof el.focus === 'function'){
+      el.focus({preventScroll:true});
+      if(activeSelStart !== null && typeof el.setSelectionRange === 'function'){
+        try{ el.setSelectionRange(activeSelStart, activeSelStart); }catch(e){}
+      }
+    }
+  }
 }
 
 /* ============================= HANDLERS ============================= */
 function attachHandlers(){
-  const toggleCustomBtn = document.getElementById('toggleCustomBtn');
-  if(toggleCustomBtn) toggleCustomBtn.onclick = ()=>{
-    state.showCustomEntry = !state.showCustomEntry;
+  // Gesamte Bestellung als Vollbild-Übersicht (statt in der kleinen,
+  // scrollenden Liste) — praktisch bei großen Bestellungen.
+  const orderOverviewBtn = document.getElementById('orderOverviewBtn');
+  if(orderOverviewBtn) orderOverviewBtn.onclick = ()=>{
+    state.showOrderOverlay = true;
     render();
   };
-
-  document.querySelectorAll('[data-key]').forEach(btn=>btn.onclick=()=>{
-    const k = btn.dataset.key;
-    if(k==='clear'){ state.entry = state.entry.slice(0,-1); }
-    else if(k==='add'){
-      addItem(parseEntry(state.entry));
-      state.entry='';
-    } else if(k===','){
-      if(!state.entry.includes(',')) state.entry += (state.entry?',':'0,');
-    } else {
-      if(state.entry==='0') state.entry = k;
-      else state.entry += k;
-    }
+  const orderOverlayClose = document.getElementById('orderOverlayClose');
+  if(orderOverlayClose) orderOverlayClose.onclick = ()=>{
+    state.showOrderOverlay = false;
     render();
-  });
+  };
+  const orderOverlayEl = document.getElementById('orderOverlay');
+  if(orderOverlayEl) orderOverlayEl.onclick = (ev)=>{
+    if(ev.target === orderOverlayEl){ state.showOrderOverlay = false; render(); }
+  };
 
   document.querySelectorAll('[data-paid-key]').forEach(btn=>btn.onclick=()=>{
     const k = btn.dataset.paidKey;
+    if(k==='clear'){
+      // ⌫ löscht erst die getippte Eingabe; ist keine da, setzt es den
+      // per Schnellwahl aufaddierten Betrag komplett zurück.
+      if(state.paidEntry){ state.paidEntry = state.paidEntry.slice(0,-1); }
+      else { state.paid = null; }
+      render();
+      return;
+    }
     state.paid = null;
-    if(k==='clear'){ state.paidEntry = state.paidEntry.slice(0,-1); }
-    else if(k===','){
+    if(k===','){
       if(!state.paidEntry.includes(',')) state.paidEntry += (state.paidEntry?',':'0,');
     } else {
       if(state.paidEntry==='0') state.paidEntry = k;
@@ -1262,8 +1372,13 @@ function attachHandlers(){
     render();
   });
 
+  // Schnellwahl-Beträge ADDIEREN sich bei mehrfachem Tippen (2× "5 €" = 10 €).
+  // Eine vorher per Tastatur begonnene Eingabe zählt als Startwert.
+  // Zurücksetzen: ⌫ auf der Tastatur (löscht erst die Eingabe, dann den Betrag).
   document.querySelectorAll('[data-paid-quick]').forEach(btn=>btn.onclick=()=>{
-    state.paid = parseFloat(btn.dataset.paidQuick);
+    const v = parseFloat(btn.dataset.paidQuick);
+    const base = state.paid !== null ? state.paid : parseEntry(state.paidEntry);
+    state.paid = Math.round((base + v) * 100) / 100;
     state.paidEntry = '';
     render();
   });
@@ -1382,10 +1497,6 @@ function attachHandlers(){
     if(idx>=0){
       state.activeBausteinIds.splice(idx,1);
     } else {
-      if(b.counted && countedActiveCount(state.activeBausteinIds) >= MAX_ACTIVE_BAUSTEINE){
-        alert('Maximal ' + MAX_ACTIVE_BAUSTEINE + ' Hauptgerichte gleichzeitig auswählbar — zuerst eins entfernen. (Extra-Gerichte und Specials zählen nicht mit.)');
-        return;
-      }
       state.activeBausteinIds.push(id);
     }
     saveActiveBausteine();
@@ -1571,7 +1682,7 @@ function attachHandlers(){
     // Nur die aktuelle Bestellung zurücksetzen — Preis-Buttons und
     // Tagesauswahl (activeBausteinIds) bleiben erhalten.
     state.items = [];
-    state.entry = '';
+    state.showOrderOverlay = false;
     state.paidEntry = '';
     state.paid = null;
     state.dineMode = 'togo';
@@ -1598,13 +1709,39 @@ function attachHandlers(){
 
 render();
 
-// Haptisches Feedback bei JEDEM Button-Druck (kurze Vibration, falls das
-// Gerät es unterstützt — z. B. Android-Tablets; iPads vibrieren nicht).
-// Der Klickton beim Hinzufügen einer Position (playFeedback) bleibt extra.
+// Fühlbares Feedback bei JEDEM Button-Druck: kurze Vibration (Android;
+// iPads unterstützen die Vibrations-API nicht) PLUS ein leiser, kurzer
+// Tick-Ton — der funktioniert auch auf dem iPad und ersetzt dort die
+// Vibration. Der hellere Klickton beim Hinzufügen einer Position
+// (playFeedback) bleibt extra, deshalb wird bei den Gericht-Buttons kein
+// zweiter Tick gespielt. Dazu drückt sich jeder Button sichtbar ein
+// (CSS: button:active{transform:scale(0.96);}).
+function playTick(){
+  try{
+    if(!feedbackAudioCtx){
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if(Ctx) feedbackAudioCtx = new Ctx();
+    }
+    if(!feedbackAudioCtx) return;
+    if(feedbackAudioCtx.state === 'suspended') feedbackAudioCtx.resume();
+    const osc = feedbackAudioCtx.createOscillator();
+    const gain = feedbackAudioCtx.createGain();
+    osc.type = 'square';
+    osc.frequency.value = 320;
+    gain.gain.setValueAtTime(0.06, feedbackAudioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, feedbackAudioCtx.currentTime + 0.04);
+    osc.connect(gain);
+    gain.connect(feedbackAudioCtx.destination);
+    osc.start();
+    osc.stop(feedbackAudioCtx.currentTime + 0.05);
+  }catch(e){ /* Feedback ist nur ein Extra */ }
+}
 document.addEventListener('click', (ev)=>{
-  if(ev.target && ev.target.closest && ev.target.closest('button')){
-    try{ if(navigator.vibrate) navigator.vibrate(12); }catch(e){}
-  }
+  const btn = ev.target && ev.target.closest ? ev.target.closest('button') : null;
+  if(!btn) return;
+  try{ if(navigator.vibrate) navigator.vibrate(12); }catch(e){}
+  // Gericht-Buttons spielen schon den helleren Klick über playFeedback().
+  if(!btn.hasAttribute('data-add-baustein')) playTick();
 }, true);
 
 // Service Worker registrieren — nötig, damit Chrome/Android "App
