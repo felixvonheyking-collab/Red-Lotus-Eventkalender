@@ -46,8 +46,8 @@ header.top{
 .status-dot.off{background:#666;box-shadow:none;}
 
 .board{
-  display:grid;grid-template-columns:repeat(auto-fill, minmax(300px, 1fr));
-  gap:18px;padding:22px;
+  display:grid;grid-template-columns:repeat(auto-fill, minmax(360px, 1fr));
+  gap:20px;padding:22px;
 }
 .empty-board{
   grid-column:1/-1;text-align:center;padding:80px 20px;opacity:0.4;font-size:20px;
@@ -70,32 +70,30 @@ header.top{
   color:var(--gold-soft);font-size:12.5px;font-weight:700;padding:4px 10px;border-radius:20px;
   margin-bottom:2px;
 }
-.order-items{display:flex;flex-direction:column;gap:2px;margin:4px 0;}
+.order-items{display:flex;flex-direction:column;gap:4px;margin:4px 0;}
 .order-item{
-  font-size:17px;display:flex;align-items:center;gap:10px;cursor:pointer;
-  padding:7px 6px;border-radius:8px;transition:background .12s;
+  font-size:19px;display:flex;align-items:center;gap:12px;cursor:pointer;
+  padding:10px 8px;border-radius:8px;transition:background .12s;
 }
 .order-item:active{background:rgba(255,255,255,0.06);}
 .order-item .item-check{
-  width:24px;height:24px;flex-shrink:0;border-radius:7px;border:2px solid var(--line);
-  display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;
+  width:28px;height:28px;flex-shrink:0;border-radius:7px;border:2px solid var(--line);
+  display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;
+}
+.order-item .item-king-tag{
+  font-size:13px;font-weight:800;color:var(--gold-soft);white-space:nowrap;
+  background:rgba(201,163,94,0.18);border:1px solid var(--gold);border-radius:20px;padding:3px 10px;
+}
+/* Sonderwünsche: bewusst laut — die Küche muss sie sehen. */
+.order-wishes{display:flex;flex-direction:column;gap:5px;margin:2px 0 4px;}
+.order-wish{
+  background:rgba(201,121,62,0.18);border:1.5px solid var(--warn);border-radius:9px;
+  padding:8px 12px;font-size:16px;font-weight:800;color:#f2d9c2;
 }
 .order-item.done .item-check{background:var(--ok);border-color:var(--ok);color:#fff;}
 .order-item.done .item-label{text-decoration:line-through;opacity:0.5;}
 .order-item .item-label{flex:1;}
 .order-item .item-box-tag{font-size:11.5px;font-weight:700;color:var(--gold-soft);opacity:0.85;white-space:nowrap;}
-.final-btn{
-  margin-top:6px;background:var(--red);color:#fff;border:none;padding:14px;border-radius:12px;
-  font-size:16px;font-weight:700;cursor:pointer;font-family:'Work Sans',sans-serif;
-  letter-spacing:0.02em;
-}
-.final-btn:active{background:var(--red-bright);}
-.final-btn:disabled{opacity:0.5;}
-.order-card.ready-glow{
-  border-color:var(--ok);box-shadow:0 0 0 3px rgba(92,131,98,0.3), var(--shadow);
-}
-.order-card.ready-glow .final-btn{background:var(--ok);}
-.order-card.ready-glow .final-btn:active{background:#4a6c50;}
 .section-title{
   grid-column:1/-1;font-family:'Marcellus',serif;font-size:16px;color:var(--gold-soft);
   opacity:0.75;letter-spacing:0.04em;text-transform:uppercase;font-size:13px;
@@ -156,8 +154,7 @@ header.top{
   .brand-mark{width:36px;height:36px;font-size:15px;}
   .board{grid-template-columns:1fr;gap:12px;padding:12px;}
   .order-number{font-size:36px;}
-  .order-item{font-size:15px;}
-  .final-btn{padding:12px;font-size:14.5px;}
+  .order-item{font-size:16px;}
   .reset-btn,.reis-btn{font-size:11.5px;padding:7px 10px;}
 }
 
@@ -278,17 +275,18 @@ document.body.addEventListener('click', ()=>{
 }, { once:true });
 
 // Jedes Gericht einzeln abhakbar (Suki/Prang/Kochstation tippen an, sobald
-// fertig). Erst wenn ALLE Positionen einer Bestellung abgehakt sind, hebt
-// sich die Karte hervor — dann kommt der finale "Ausgegeben"-Button, den
-// nur Felix bei der tatsächlichen Übergabe drückt.
+// fertig). Sobald ALLE Positionen abgehakt sind, gilt die Bestellung
+// automatisch als abgeschlossen und verschwindet vom Board — ein eigener
+// "Ausgegeben"-Button ist nicht mehr nötig (der letzte Haken erledigt das,
+// siehe Toggle-Handler in render()).
 function orderCardHtml(o){
   const items = o.items || [];
-  const allDone = items.length > 0 && items.every(it => it.done);
   const allEigene = items.length > 0 && items.every(it => it.box === 'eigene');
   const dineLabel = o.dineMode === 'hier' ? 'zum Hier essen' : 'To-Go';
   const modeTag = dineLabel + (allEigene ? ' · eigene Box' : '');
+  const wishes = Array.isArray(o.wishes) ? o.wishes : [];
   return `
-    <div class="order-card ${o.isVorbestellung ? 'vorbestellung' : ''} ${allDone ? 'ready-glow' : ''}">
+    <div class="order-card ${o.isVorbestellung ? 'vorbestellung' : ''}">
       ${o.isVorbestellung ? `<div class="vorbestell-badge">🕒 Vorbestellung — ${escapeHtml(o.customerName||'ohne Namen')} · ${escapeHtml(o.pickupTime||'—')}</div>` : ''}
       <div class="order-head">
         <div>
@@ -297,16 +295,17 @@ function orderCardHtml(o){
         </div>
         <div class="order-time">${fmtTime(o.createdAt)}</div>
       </div>
+      ${wishes.length ? `<div class="order-wishes">${wishes.map(w=>`<div class="order-wish">⚠️ ${escapeHtml(w)}</div>`).join('')}</div>` : ''}
       <div class="order-items">
         ${items.map((it, idx) => `
           <div class="order-item ${it.done ? 'done' : ''}" data-toggle-item="${o.id}" data-item-idx="${idx}">
             <span class="item-check">${it.done ? '✓' : ''}</span>
             <span class="item-label">${escapeHtml(it.label||'Position')}</span>
+            ${it.king ? `<span class="item-king-tag">👑 King Kong</span>` : ''}
             ${it.box === 'eigene' && !allEigene ? `<span class="item-box-tag">🥡 eigene Box</span>` : ''}
           </div>`).join('')}
       </div>
       ${o.isVorbestellung ? `<button type="button" class="cancel-btn" data-cancel-order="${o.id}">🗑 Vorbestellung entfernen</button>` : ''}
-      <button type="button" class="final-btn" data-final="${o.id}">✓ Ausgegeben</button>
     </div>`;
 }
 
@@ -377,39 +376,29 @@ function render(orders){
   board.innerHTML = offen.map(o => orderCardHtml(o)).join('');
 
   // Position antippen -> abhaken/zurücknehmen (schreibt die komplette
-  // items-Liste des jeweiligen Auftrags zurück).
+  // items-Liste des jeweiligen Auftrags zurück). Setzt der Tipp den LETZTEN
+  // fehlenden Haken, wird die Bestellung im selben Schreibvorgang als
+  // "fertig" abgeschlossen — sie verschwindet vom Board und erscheint auf
+  // der Kundenanzeige. Ein separater "Ausgegeben"-Button entfällt.
   board.querySelectorAll('[data-toggle-item]').forEach(row=>{
     row.onclick = async ()=>{
       const order = offen.find(o => o.id === row.dataset.toggleItem);
       if(!order) return;
       const idx = parseInt(row.dataset.itemIdx, 10);
       const newItems = (order.items||[]).map((it,i)=> i===idx ? { ...it, done: !it.done } : it);
+      const allDone = newItems.length > 0 && newItems.every(it => it.done);
       try{
-        await updateDoc(doc(db, 'orders', order.id), { items: newItems });
+        if(allDone){
+          await updateDoc(doc(db, 'orders', order.id), {
+            items: newItems,
+            status: 'fertig',
+            readyAt: new Date().toISOString()
+          });
+        } else {
+          await updateDoc(doc(db, 'orders', order.id), { items: newItems });
+        }
       }catch(e){
         console.error('Konnte Position nicht aktualisieren:', e);
-      }
-    };
-  });
-
-  board.querySelectorAll('[data-final]').forEach(btn=>{
-    btn.onclick = async (ev)=>{
-      ev.stopPropagation();
-      const order = offen.find(o => o.id === btn.dataset.final);
-      const items = (order && order.items) || [];
-      const allDone = items.length > 0 && items.every(it => it.done);
-      if(!allDone && !confirm('Noch nicht alle Positionen abgehakt — trotzdem als ausgegeben markieren?')) return;
-      btn.disabled = true;
-      btn.textContent = '…';
-      try{
-        await updateDoc(doc(db, 'orders', btn.dataset.final), {
-          status: 'fertig',
-          readyAt: new Date().toISOString()
-        });
-      }catch(e){
-        console.error('Konnte Bestellung nicht als ausgegeben markieren:', e);
-        btn.disabled = false;
-        btn.textContent = '✓ Ausgegeben';
       }
     };
   });
@@ -497,6 +486,14 @@ if(reisClearBtn) reisClearBtn.onclick = async (ev)=>{
   try{ await setDoc(doc(db, 'alerts', 'reis'), { active: false }, { merge: true }); }
   catch(e){ console.error('REIS-Alarm konnte nicht quittiert werden:', e); }
 };
+
+// Haptisches Feedback bei jedem Tipp auf Buttons und Abhak-Zeilen (kurze
+// Vibration, falls das Gerät es unterstützt — z. B. Android-Tablets).
+document.addEventListener('click', (ev)=>{
+  if(ev.target && ev.target.closest && ev.target.closest('button, .order-item, .mine-item')){
+    try{ if(navigator.vibrate) navigator.vibrate(12); }catch(e){}
+  }
+}, true);
 
 // Bildschirm wach halten, solange die Seite offen ist (falls vom Browser unterstützt).
 if('wakeLock' in navigator){

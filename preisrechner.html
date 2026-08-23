@@ -240,6 +240,48 @@ button.link-chip.active{background:var(--gold);color:var(--ink);border-color:var
 }
 .mine-star.active{opacity:1;border-color:var(--gold);background:var(--gold);color:var(--ink);}
 
+/* Gerichte-Spalten: eine Spalte pro Gericht (z. B. Pad Thai), darin
+   untereinander alle Varianten × Größen (Huhn normal, Huhn klein, Tofu
+   normal, Tofu klein, …) — so liegt alles zu einem Gericht beieinander
+   und Vertipper zwischen Gerichten werden unwahrscheinlicher. */
+.dish-cols{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;align-items:start;}
+.dish-col{display:flex;flex-direction:column;gap:6px;background:var(--ink);border:1px solid var(--line);border-radius:10px;padding:6px;}
+.dish-col-title{font-size:11px;font-weight:800;text-align:center;color:var(--gold-soft);padding:3px 0 5px;border-bottom:1px solid var(--line);letter-spacing:0.02em;}
+.dish-col .dish-btn{width:100%;padding:11px 4px;font-size:11px;}
+@media (max-width:600px){ .dish-cols{grid-template-columns:repeat(2,1fr);} }
+
+/* King-Kong-Markierung (👑) pro Posten */
+.item-king-btn{
+  background:var(--ink);border:1px solid var(--line);color:var(--cream);opacity:0.55;
+  padding:4px 8px;border-radius:8px;font-size:12px;cursor:pointer;
+  font-family:'Work Sans',sans-serif;white-space:nowrap;
+}
+.item-king-btn.set{opacity:1;border-color:var(--gold);background:rgba(201,163,94,0.18);}
+.item-king-tag{font-size:11px;font-weight:800;color:var(--gold-soft);white-space:nowrap;}
+
+/* Sonderwünsche: Chips zum Schnell-Antippen + Liste an der Bestellung */
+.wish-chips{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;}
+.wish-chip{
+  background:var(--ink-3);border:1px solid var(--line);color:var(--cream);
+  padding:9px 14px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;
+  font-family:'Work Sans',sans-serif;display:inline-flex;align-items:center;gap:8px;
+}
+.wish-chip:active{background:var(--red);border-color:var(--red-bright);color:#fff;}
+.wish-chip .chip-del{opacity:0.5;font-size:11px;}
+.wish-row{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  background:rgba(201,121,62,0.14);border:1px solid var(--warn);border-radius:9px;
+  padding:7px 10px;font-size:12.5px;font-weight:600;
+}
+.wish-row button{
+  background:transparent;border:none;color:var(--cream);cursor:pointer;font-size:13px;padding:2px 6px;
+}
+.wish-add-row{display:flex;gap:8px;}
+.wish-add-row input{
+  flex:1;background:var(--ink-3);border:1px solid var(--line);color:var(--cream);
+  padding:10px 12px;border-radius:9px;font-size:14px;font-family:'Work Sans',sans-serif;min-width:0;
+}
+
 /* Katalog verwalten (Gerichte/Specials hinzufügen, Preise ändern) */
 .katalog-list{display:flex;flex-direction:column;gap:6px;margin:10px 0;}
 .katalog-row{
@@ -316,8 +358,9 @@ button.link-chip.active{background:var(--gold);color:var(--ink);border-color:var
 /* An Küche senden / Bezahlt */
 .order-sent-banner{
   margin-top:10px;background:rgba(92,131,98,0.18);border:1px solid var(--ok);color:var(--gold-soft);
-  padding:10px 12px;border-radius:10px;font-size:13px;text-align:center;
+  padding:14px 12px;border-radius:10px;font-size:15px;text-align:center;line-height:1.5;
 }
+.order-sent-banner b{font-size:30px;display:inline-block;padding:0 4px;vertical-align:-2px;}
 .order-sent-banner.vorbestellung{background:rgba(201,163,94,0.16);border-color:var(--gold);}
 .btn.paid{background:var(--ok);}
 .btn.paid:hover{background:#4a6c50;}
@@ -493,9 +536,6 @@ body.admin-view .app{max-width:640px;margin:0 auto;}
       <h3>Offene Vorbestellungen</h3>
       <p class="hint" style="margin-bottom:10px;">Noch nicht bezahlt — Kunde zahlt erst bei Abholung. „💰 Bezahlt" antippen, sobald kassiert wurde.</p>
       <div id="vorbestellList"></div>
-    </div>
-    <div class="panel">
-      <button type="button" class="reis-toggle-btn" id="reisBtn">🍚 REIS ist alle</button>
     </div>
   </div>
 </div>
@@ -774,6 +814,26 @@ function savePrices(prices){
   catch(e){ console.warn('Preise konnten nicht gespeichert werden:', e); }
 }
 
+/* Sonderwunsch-Schnellauswahl: häufige Wünsche als Chips, pro Gerät
+   gespeichert. Neue Wünsche aus dem Eingabefeld werden automatisch als
+   Chip gemerkt (bis 15 Stück, älteste fliegen raus, per ✕ löschbar). */
+const WISH_PRESETS_KEY = 'redlotus_preisrechner_wunsch_presets';
+const DEFAULT_WISH_PRESETS = ['ohne Ei', 'ohne Koriander', 'ohne Erdnüsse', 'wenig scharf', 'extra scharf'];
+function loadWishPresets(){
+  try{
+    const raw = localStorage.getItem(WISH_PRESETS_KEY);
+    if(raw){
+      const arr = JSON.parse(raw);
+      if(Array.isArray(arr)) return arr.filter(w=>typeof w==='string' && w.trim());
+    }
+  }catch(e){ console.warn('Wunsch-Vorlagen konnten nicht geladen werden:', e); }
+  return DEFAULT_WISH_PRESETS.slice();
+}
+function saveWishPresets(presets){
+  try{ localStorage.setItem(WISH_PRESETS_KEY, JSON.stringify(presets)); }
+  catch(e){ console.warn('Wunsch-Vorlagen konnten nicht gespeichert werden:', e); }
+}
+
 /* ============================= STATE ============================= */
 const INITIAL_BRAND = loadBrand();
 const INITIAL_CATALOG = loadCatalog(INITIAL_BRAND);
@@ -787,12 +847,16 @@ let state = {
   paidEntry: '',      // aktuell eingetippter "Bezahlt mit"-Betrag
   paid: null,          // bestätigter "bezahlt mit"-Betrag (per Schnellwahl-Button)
 
-  orderMode: 'gerichte',   // 'gerichte' oder 'sonstige' — welcher Reiter zum Hinzufügen aktiv ist
+  // Aktiver Reiter: 'gerichte' (Bestellung tippen), 'vorbestellung' (Name/
+  // Uhrzeit für die aktuelle Bestellung), 'wuensche' (Sonderwünsche wie
+  // "ohne Ei") oder 'tagesauswahl' (Marke, Tagesgerichte, Katalog).
+  orderMode: 'gerichte',
 
-  // 'kasse' (Bestellung/Kassieren, Standard) oder 'tagesauswahl' (Marke wählen,
-  // Tagesgerichte festlegen, Namen/Preise anpassen, Katalog pflegen) — eigene
-  // Ansicht über den Header-Link, nicht mehr dauerhaft auf dem Kassenbildschirm.
-  view: 'kasse',
+  // Sonderwünsche der AKTUELLEN Bestellung (werden mitgesendet und auf dem
+  // Küchenbildschirm hervorgehoben angezeigt).
+  wishes: [],
+  wishEntry: '',
+  wishPresets: loadWishPresets(),
 
   brand: INITIAL_BRAND,       // 'redlotus' oder 'limethyme'
   catalog: INITIAL_CATALOG,   // { dishes:[...], specials:[...] } der aktuellen Marke
@@ -872,47 +936,70 @@ function dishProteinBorderClass(name){
    einer Position (im "+ Position"-Overlay auf dem Kassenbildschirm) — die
    heutige Marke und die aktiven Gerichte werden dort NICHT mehr verwaltet,
    das passiert jetzt ausschließlich in der separaten "Tagesauswahl"-Ansicht
-   (renderTagesauswahlView, erreichbar über den Header-Link). */
+   (Reiter "⚙ Tagesauswahl", siehe renderTagesauswahlTab). */
 function renderDishQuickGrid(){
   const items = allCatalogItemsFrom(state.catalog);
   const active = state.activeBausteinIds
     .map(id => items.find(b=>b.id===id))
     .filter(Boolean);
-  return active.length
-    ? `<div class="dish-grid">${active.map(b => {
-        const cls = `dish-btn ${dishTagClass(b.name)} ${dishProteinBorderClass(b.name)}`;
-        return (b.type === 'single' || b.kleinPrice == null)
-        ? `<button type="button" class="${cls}" data-add-baustein="${b.id}" data-size="normal">${escapeHtmlPR(b.name)}<br><b>${fmtEUR(b.price)}</b></button>`
-        : `
-        <button type="button" class="${cls}" data-add-baustein="${b.id}" data-size="normal">${escapeHtmlPR(b.name)}<br><b>${fmtEUR(b.price)}</b></button>
-        <button type="button" class="${cls}" data-add-baustein="${b.id}" data-size="klein">${escapeHtmlPR(b.name)} <b>(Klein)</b><br><b>${fmtEUR(b.kleinPrice)}</b></button>
-      `;
-      }).join('')}</div>`
-    : `<div class="empty-state">Noch keine Gerichte für heute ausgewählt. Oben rechts auf „🍽️ Tagesauswahl" tippen und bis zu ${MAX_ACTIVE_BAUSTEINE} Hauptgerichte festlegen.</div>`;
+
+  // Aktive Einträge zu Gerichts-Spalten bündeln: gleiche group (z. B. alle
+  // "Pad Thai – …") landen in EINER Spalte, darin untereinander alle
+  // Varianten × Größen (Huhn normal, Huhn klein, Tofu normal, Tofu klein …).
+  // Einträge ohne group (Specials, freie Gerichte) bekommen je eine eigene Spalte.
+  const cols = [];
+  const colByKey = {};
+  active.forEach(b=>{
+    const key = b.group || b.id;
+    if(!colByKey[key]){
+      // Spaltentitel: gemeinsamer Gerichtsname vor dem " – " (falls vorhanden).
+      const title = b.group && b.name.includes(' – ') ? b.name.split(' – ')[0] : b.name;
+      colByKey[key] = { title, entries: [] };
+      cols.push(colByKey[key]);
+    }
+    colByKey[key].entries.push(b);
+  });
+
+  const colHtml = cols.map(col=>{
+    const buttons = col.entries.map(b=>{
+      const cls = `dish-btn ${dishTagClass(b.name)} ${dishProteinBorderClass(b.name)}`;
+      // Button-Beschriftung: nur der Varianten-Teil (nach " – "), der
+      // Gerichtsname steht schon im Spaltenkopf.
+      const variantLabel = (b.group && b.name.includes(' – ')) ? b.name.split(' – ').slice(1).join(' – ') : b.name;
+      if(b.type === 'single' || b.kleinPrice == null){
+        return `<button type="button" class="${cls}" data-add-baustein="${b.id}" data-size="normal">${escapeHtmlPR(variantLabel)}<br><b>${fmtEUR(b.price)}</b></button>`;
+      }
+      return `
+        <button type="button" class="${cls}" data-add-baustein="${b.id}" data-size="normal">${escapeHtmlPR(variantLabel)} · Normal<br><b>${fmtEUR(b.price)}</b></button>
+        <button type="button" class="${cls}" data-add-baustein="${b.id}" data-size="klein">${escapeHtmlPR(variantLabel)} · Klein<br><b>${fmtEUR(b.kleinPrice)}</b></button>`;
+    }).join('');
+    return `<div class="dish-col"><div class="dish-col-title">${escapeHtmlPR(col.title)}</div>${buttons}</div>`;
+  }).join('');
+
+  const customEntryHtml = `
+    <div class="manage-row" style="justify-content:flex-start;margin-top:12px;">
+      <button type="button" id="toggleCustomBtn">${state.showCustomEntry ? '✕ Individuellen Betrag schließen' : '+ Individueller Betrag'}</button>
+    </div>
+    ${state.showCustomEntry ? `
+    <div class="keypad-display"><span class="euro">€</span>${state.entry || '0'}</div>
+    <div class="keypad">
+      ${['7','8','9','4','5','6','1','2','3'].map(n=>`<button type="button" data-key="${n}">${n}</button>`).join('')}
+      <button type="button" data-key="0">0</button>
+      <button type="button" data-key=",">,</button>
+      <button type="button" class="clear" data-key="clear">⌫</button>
+      <button type="button" class="add" data-key="add">Hinzufügen</button>
+    </div>` : ''}`;
+
+  return (cols.length
+    ? `<div class="dish-cols">${colHtml}</div>`
+    : `<div class="empty-state">Noch keine Gerichte für heute ausgewählt. Auf den Reiter „⚙ Tagesauswahl" tippen und bis zu ${MAX_ACTIVE_BAUSTEINE} Hauptgerichte festlegen.</div>`)
+    + customEntryHtml;
 }
 
-/* ============================= RENDER: TAGESAUSWAHL (eigene Ansicht) =============================
+/* ============================= RENDER: TAGESAUSWAHL =============================
    Marke wählen, heutige Gerichte auswählen (bis zu 6 Hauptgerichte),
    Namen/Preise anpassen, neue Gerichte/Specials anlegen, welche löschen —
-   alles hier statt auf dem Kassenbildschirm. */
-function renderTagesauswahlView(){
-  return `
-  <div class="panel">
-    <button type="button" class="btn ghost" id="backToKasseBtn" style="margin-top:0;margin-bottom:16px;">← Zurück zur Kasse</button>
-    <h3>🍽️ Tagesauswahl</h3>
-
-    <div class="order-mode-tabs" style="margin-bottom:12px;">
-      ${BRANDS.map(b=>`<button type="button" data-select-brand="${b.id}" class="${state.brand===b.id?'active':''}">${b.id==='redlotus'?'🔴':'🟢'} ${escapeHtmlPR(b.name)}</button>`).join('')}
-    </div>
-
-    <div class="order-mode-tabs" style="margin-bottom:12px;">
-      <button type="button" data-admin-tab="auswahl" class="${state.dishAdminTab==='auswahl'?'active':''}">✓ Tagesauswahl</button>
-      <button type="button" data-admin-tab="katalog" class="${state.dishAdminTab==='katalog'?'active':''}">🛠 Katalog</button>
-    </div>
-    ${state.dishAdminTab==='auswahl' ? renderAuswahlTab() : renderKatalogTab()}
-  </div>
-  `;
-}
+   als Reiter "⚙ Tagesauswahl" (siehe renderTagesauswahlTab). */
 function renderAuswahlTab(){
   const items = allCatalogItemsFrom(state.catalog);
   const countedCount = countedActiveCount(state.activeBausteinIds);
@@ -980,36 +1067,55 @@ function renderKatalogTab(){
     </div>
   `;
 }
-function renderSonstigePreise(){
+/* Reiter "Vorbestellung": Name + Uhrzeit für die AKTUELLE Bestellung.
+   (Die Liste der offenen Vorbestellungen bleibt im rechten Seitenpanel.) */
+function renderVorbestellungTab(){
   return `
-    <div class="manage-row">
-      <button type="button" id="toggleEditBtn">${state.editMode ? '✓ Fertig' : '✎ Preise verwalten'}</button>
+    <div class="vorbestell-box ${state.isVorbestellung?'active':''}" style="margin-top:4px;">
+      <button type="button" class="vorbestell-toggle ${state.isVorbestellung?'active':''}" id="vorbestellToggle">
+        ${state.isVorbestellung ? '✓' : '☐'} Diese Bestellung ist eine Vorbestellung
+      </button>
+      ${state.isVorbestellung ? `
+      <div class="vorbestell-fields">
+        <input type="text" id="vorbestellName" placeholder="Name" value="${escapeHtmlPR(state.vorbestellName)}">
+        <input type="time" class="vorbestell-time" id="vorbestellZeit" value="${state.vorbestellZeit}">
+      </div>
+      <div class="hint" style="margin-top:8px;">Wird beim Senden vorgemerkt statt sofort kassiert — Zahlung bei Abholung über „Offene Vorbestellungen" rechts.</div>` : `
+      <div class="hint" style="margin-top:8px;">Antippen, wenn der Kunde erst später abholt. Gerichte wie gewohnt im Reiter „Gerichte" eintippen.</div>`}
     </div>
-    <div class="price-grid">
-      ${state.prices.map((p,idx)=>`
-        <div class="price-btn-wrap">
-          <button type="button" class="price-btn" data-static-price="${p}" ${state.editMode?'disabled':''}>${fmtEUR(p)}</button>
-          ${state.editMode ? `<button type="button" class="price-btn-del" data-del-price="${idx}" title="Preis entfernen">✕</button>` : ''}
-        </div>`).join('')}
-    </div>
-    ${state.editMode ? `
-    <div class="add-price-row">
-      <input type="text" inputmode="decimal" id="newPriceInput" placeholder="Neuer Preis, z. B. 6,50" value="${state.newPriceEntry}">
-      <button type="button" id="addPriceBtn">+ Hinzufügen</button>
-    </div>` : ''}
+  `;
+}
 
-    <div class="manage-row" style="justify-content:flex-start;">
-      <button type="button" id="toggleCustomBtn">${state.showCustomEntry ? '✕ Individuellen Betrag schließen' : '+ Individueller Betrag'}</button>
+/* Reiter "Sonderwünsche": besondere Wünsche zur AKTUELLEN Bestellung
+   (z. B. "ohne Ei") — erscheinen hervorgehoben auf dem Küchenbildschirm. */
+function renderWuenscheTab(){
+  return `
+    <div class="hint" style="margin:4px 0 8px;">Wünsche gelten für die aktuelle Bestellung und erscheinen groß auf dem Küchenbildschirm. Häufige Wünsche als Chip antippen — neue Wünsche unten eintippen (werden automatisch als Chip gemerkt).</div>
+    <div class="wish-chips">
+      ${state.wishPresets.map((w,idx)=>`
+        <button type="button" class="wish-chip" data-add-wish="${idx}">${escapeHtmlPR(w)} <span class="chip-del" data-del-wish-preset="${idx}" title="Chip löschen">✕</span></button>
+      `).join('') || '<div class="hint">Noch keine gemerkten Wünsche.</div>'}
     </div>
-    ${state.showCustomEntry ? `
-    <div class="keypad-display"><span class="euro">€</span>${state.entry || '0'}</div>
-    <div class="keypad">
-      ${['7','8','9','4','5','6','1','2','3'].map(n=>`<button type="button" data-key="${n}">${n}</button>`).join('')}
-      <button type="button" data-key="0">0</button>
-      <button type="button" data-key=",">,</button>
-      <button type="button" class="clear" data-key="clear">⌫</button>
-      <button type="button" class="add" data-key="add">Hinzufügen</button>
-    </div>` : ''}
+    <div class="wish-add-row">
+      <input type="text" id="wishInput" placeholder="z. B. ohne Ei" value="${escapeHtmlPR(state.wishEntry)}">
+      <button type="button" class="btn ghost" id="addWishBtn" style="margin-top:0;width:auto;padding:10px 16px;">+ Hinzufügen</button>
+    </div>
+  `;
+}
+
+/* Reiter "Tagesauswahl": Marke wählen, Tagesgerichte festlegen, Katalog
+   pflegen — früher eine eigene Ansicht hinter dem Header-Link, jetzt als
+   Reiter direkt neben Gerichte/Vorbestellung/Sonderwünsche. */
+function renderTagesauswahlTab(){
+  return `
+    <div class="order-mode-tabs" style="margin:4px 0 12px;">
+      ${BRANDS.map(b=>`<button type="button" data-select-brand="${b.id}" class="${state.brand===b.id?'active':''}">${b.id==='redlotus'?'🔴':'🟢'} ${escapeHtmlPR(b.name)}</button>`).join('')}
+    </div>
+    <div class="order-mode-tabs" style="margin-bottom:12px;">
+      <button type="button" data-admin-tab="auswahl" class="${state.dishAdminTab==='auswahl'?'active':''}">✓ Tagesauswahl</button>
+      <button type="button" data-admin-tab="katalog" class="${state.dishAdminTab==='katalog'?'active':''}">🛠 Katalog</button>
+    </div>
+    ${state.dishAdminTab==='auswahl' ? renderAuswahlTab() : renderKatalogTab()}
   `;
 }
 
@@ -1021,52 +1127,38 @@ function render(){
   const paidAmount = state.paid !== null ? state.paid : parseEntry(state.paidEntry);
   const change = paidAmount - t;
 
-  document.documentElement.classList.toggle('admin-view', state.view === 'tagesauswahl');
-  document.body.classList.toggle('admin-view', state.view === 'tagesauswahl');
-
-  const headerHtml = `
-  <header class="top">
-    <div class="brand">
-      <div class="brand-mark">RL</div>
-      <div>
-        <h1 class="wordmark">Red Lotus</h1>
-        <div class="sub">Preisrechner</div>
-      </div>
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <a href="index.html" class="link-chip">📅 Kalender</a>
-      <button type="button" id="viewToggleBtn" class="link-chip ${state.view==='tagesauswahl'?'active':''}">${state.view==='tagesauswahl' ? '🧾 Zur Kasse' : '🍽️ Tagesauswahl'}</button>
-    </div>
-  </header>`;
-
-  if(state.view === 'tagesauswahl'){
-    app.innerHTML = headerHtml + renderTagesauswahlView();
-    payPanel.innerHTML = '';
-    attachHandlers();
-    return;
-  }
-
-  app.innerHTML = headerHtml + `
+  app.innerHTML = `
   <div class="panel order-panel">
     <div class="order-scroll">
-      <!-- 1. Gerichte: was will der Kunde -->
+      <!-- 1. Reiter: Gerichte / Vorbestellung / Sonderwünsche / Tagesauswahl -->
       <div class="order-mode-tabs compact">
         <button type="button" data-order-mode="gerichte" class="${state.orderMode==='gerichte'?'active':''}">🍜 Gerichte</button>
-        <button type="button" data-order-mode="sonstige" class="${state.orderMode==='sonstige'?'active':''}">💰 Sonstige Preise</button>
+        <button type="button" data-order-mode="vorbestellung" class="${state.orderMode==='vorbestellung'?'active':''}">🕒 Vorbestellung${state.isVorbestellung?' ✓':''}</button>
+        <button type="button" data-order-mode="wuensche" class="${state.orderMode==='wuensche'?'active':''}">📝 Sonderwünsche${state.wishes.length?' ('+state.wishes.length+')':''}</button>
+        <button type="button" data-order-mode="tagesauswahl" class="${state.orderMode==='tagesauswahl'?'active':''}">⚙ Tagesauswahl</button>
       </div>
 
-      ${state.orderMode==='gerichte' ? renderDishQuickGrid() : renderSonstigePreise()}
+      ${state.orderMode==='gerichte' ? renderDishQuickGrid()
+        : state.orderMode==='vorbestellung' ? renderVorbestellungTab()
+        : state.orderMode==='wuensche' ? renderWuenscheTab()
+        : renderTagesauswahlTab()}
 
       <div class="item-list">
         ${state.items.length ? state.items.map((it,idx)=>`
           <div class="item-row">
-            <span class="dish-label">${it.label ? escapeHtmlPR(it.label) : ('Posten '+(idx+1))}</span>
+            <span class="dish-label">${it.label ? escapeHtmlPR(it.label) : ('Posten '+(idx+1))}${it.king ? ' <span class="item-king-tag">👑 King Kong</span>' : ''}</span>
             <span style="display:flex;align-items:center;gap:8px;">
               <button type="button" class="item-box-btn ${it.box?'set':''}" data-cycle-box="${it.id}" title="Eigene Box">${it.box==='eigene' ? '🥡 eigene Box' : '📦 Box?'}</button>
+              <button type="button" class="item-king-btn ${it.king?'set':''}" data-toggle-king="${it.id}" title="King Kong">👑</button>
               <span class="price">${fmtEUR(it.price)}</span>
               <button type="button" data-del-item="${it.id}" title="Entfernen">✕</button>
             </span>
           </div>`).join('') : '<div class="empty-state">Noch keine Posten hinzugefügt.</div>'}
+        ${state.wishes.map((w,idx)=>`
+          <div class="wish-row">
+            <span>📝 ${escapeHtmlPR(w)}</span>
+            <button type="button" data-del-wish="${idx}" title="Wunsch entfernen">✕</button>
+          </div>`).join('')}
       </div>
     </div>
 
@@ -1077,18 +1169,8 @@ function render(){
         <button type="button" class="dine-tab ${state.dineMode==='hier'?'active':''}" data-dine-mode="hier">🍽️ Hier essen</button>
         <button type="button" class="box-tab ${state.allEigeneBox?'active':''}" id="allEigeneBoxBtn">${state.allEigeneBox ? '✓' : '☐'} eigene Box</button>
       </div>
-
-      <!-- Vorbestellung: eigener Bereich mit Name + Uhrzeit -->
-      <div class="vorbestell-box ${state.isVorbestellung?'active':''}">
-        <button type="button" class="vorbestell-toggle ${state.isVorbestellung?'active':''}" id="vorbestellToggle">
-          ${state.isVorbestellung ? '✓' : '☐'} Vorbestellung
-        </button>
-        ${state.isVorbestellung ? `
-        <div class="vorbestell-fields">
-          <input type="text" id="vorbestellName" placeholder="Name" value="${escapeHtmlPR(state.vorbestellName)}">
-          <input type="time" class="vorbestell-time" id="vorbestellZeit" value="${state.vorbestellZeit}">
-        </div>` : ''}
-      </div>
+      ${state.isVorbestellung && state.orderNumber === null ? `
+      <div class="hint" style="margin-top:8px;">🕒 Vorbestellung aktiv — ${escapeHtmlPR(state.vorbestellName||'Name fehlt')} · ${escapeHtmlPR(state.vorbestellZeit||'Uhrzeit fehlt')} (Reiter „Vorbestellung")</div>` : ''}
 
       <!-- 4. An Küche senden — direkt hier links bei der Bestellung -->
       <div class="send-section">
@@ -1146,46 +1228,10 @@ function render(){
 
 /* ============================= HANDLERS ============================= */
 function attachHandlers(){
-  document.querySelectorAll('[data-static-price]').forEach(btn=>btn.onclick=()=>{
-    if(state.editMode) return;
-    addItem(parseFloat(btn.dataset.staticPrice));
-    render();
-  });
-
-  const toggleEditBtn = document.getElementById('toggleEditBtn');
-  if(toggleEditBtn) toggleEditBtn.onclick = ()=>{
-    state.editMode = !state.editMode;
-    state.newPriceEntry = '';
-    render();
-  };
-
   const toggleCustomBtn = document.getElementById('toggleCustomBtn');
   if(toggleCustomBtn) toggleCustomBtn.onclick = ()=>{
     state.showCustomEntry = !state.showCustomEntry;
     render();
-  };
-
-  document.querySelectorAll('[data-del-price]').forEach(btn=>btn.onclick=()=>{
-    const idx = parseInt(btn.dataset.delPrice, 10);
-    state.prices.splice(idx, 1);
-    savePrices(state.prices);
-    render();
-  });
-
-  const newPriceInput = document.getElementById('newPriceInput');
-  if(newPriceInput){
-    newPriceInput.oninput = ()=>{ state.newPriceEntry = newPriceInput.value; };
-    newPriceInput.onkeydown = (ev)=>{ if(ev.key==='Enter') addPriceBtn.click(); };
-  }
-  const addPriceBtn = document.getElementById('addPriceBtn');
-  if(addPriceBtn) addPriceBtn.onclick = ()=>{
-    const val = parseEntry(state.newPriceEntry);
-    if(val>0){
-      state.prices.push(val);
-      savePrices(state.prices);
-      state.newPriceEntry = '';
-      render();
-    }
   };
 
   document.querySelectorAll('[data-key]').forEach(btn=>btn.onclick=()=>{
@@ -1227,6 +1273,59 @@ function attachHandlers(){
     render();
   });
 
+  // 👑 King Kong pro Posten: reiner Vermerk (kein Preisaufschlag) — steht
+  // dann neben dem Gericht in der Bestellung und auf dem Küchenbildschirm.
+  document.querySelectorAll('[data-toggle-king]').forEach(btn=>btn.onclick=()=>{
+    const it = state.items.find(x=>x.id===btn.dataset.toggleKing);
+    if(!it) return;
+    it.king = !it.king;
+    render();
+  });
+
+  // Sonderwünsche: Chip antippen -> zur aktuellen Bestellung; Eingabefeld
+  // -> zur Bestellung UND als Chip merken; ✕ am Chip löscht die Vorlage.
+  document.querySelectorAll('[data-add-wish]').forEach(btn=>btn.onclick=(ev)=>{
+    if(ev.target && ev.target.dataset && ev.target.dataset.delWishPreset !== undefined) return;
+    const w = state.wishPresets[parseInt(btn.dataset.addWish,10)];
+    if(!w) return;
+    if(!state.wishes.includes(w)) state.wishes.push(w);
+    playFeedback();
+    render();
+  });
+  document.querySelectorAll('[data-del-wish-preset]').forEach(el=>el.onclick=(ev)=>{
+    ev.stopPropagation();
+    const idx = parseInt(el.dataset.delWishPreset,10);
+    const w = state.wishPresets[idx];
+    if(w===undefined) return;
+    if(!confirm('Chip „'+w+'" löschen?')) return;
+    state.wishPresets.splice(idx,1);
+    saveWishPresets(state.wishPresets);
+    render();
+  });
+  document.querySelectorAll('[data-del-wish]').forEach(btn=>btn.onclick=()=>{
+    state.wishes.splice(parseInt(btn.dataset.delWish,10),1);
+    render();
+  });
+  const wishInput = document.getElementById('wishInput');
+  if(wishInput){
+    wishInput.oninput = ()=>{ state.wishEntry = wishInput.value; };
+    wishInput.onkeydown = (ev)=>{ if(ev.key==='Enter'){ ev.preventDefault(); const b=document.getElementById('addWishBtn'); if(b) b.click(); } };
+  }
+  const addWishBtn = document.getElementById('addWishBtn');
+  if(addWishBtn) addWishBtn.onclick = ()=>{
+    const w = (state.wishEntry||'').trim();
+    if(!w) return;
+    if(!state.wishes.includes(w)) state.wishes.push(w);
+    if(!state.wishPresets.includes(w)){
+      state.wishPresets.push(w);
+      if(state.wishPresets.length > 15) state.wishPresets.shift();
+      saveWishPresets(state.wishPresets);
+    }
+    state.wishEntry = '';
+    playFeedback();
+    render();
+  };
+
   // Box-Vermerk pro Posten: einfaches An/Aus ("eigene Box" oder kein Vermerk).
   document.querySelectorAll('[data-cycle-box]').forEach(btn=>btn.onclick=()=>{
     const it = state.items.find(x=>x.id===btn.dataset.cycleBox);
@@ -1252,26 +1351,14 @@ function attachHandlers(){
     render();
   });
 
-  // Bestell-Modus-Tabs (Gerichte / Sonstige Preise)
+  // Reiter (Gerichte / Vorbestellung / Sonderwünsche / Tagesauswahl)
   document.querySelectorAll('[data-order-mode]').forEach(btn=>btn.onclick=()=>{
     state.orderMode = btn.dataset.orderMode;
     render();
   });
 
-  // Kopfzeile: Kasse <-> Tagesauswahl umschalten.
-  const viewToggleBtn = document.getElementById('viewToggleBtn');
-  if(viewToggleBtn) viewToggleBtn.onclick = ()=>{
-    state.view = state.view === 'tagesauswahl' ? 'kasse' : 'tagesauswahl';
-    render();
-  };
-  const backToKasseBtn = document.getElementById('backToKasseBtn');
-  if(backToKasseBtn) backToKasseBtn.onclick = ()=>{
-    state.view = 'kasse';
-    render();
-  };
-
   // Marke umschalten (Red Lotus / Lime & Thyme) — lädt den jeweiligen Katalog
-  // und die dazu gespeicherte Tagesauswahl neu. Nur in der Tagesauswahl-Ansicht sichtbar.
+  // und die dazu gespeicherte Tagesauswahl neu. Nur im Tagesauswahl-Reiter sichtbar.
   document.querySelectorAll('[data-select-brand]').forEach(btn=>btn.onclick=()=>{
     const id = btn.dataset.selectBrand;
     if(id === state.brand) return;
@@ -1452,8 +1539,9 @@ function attachHandlers(){
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items: state.items.map(it => ({ label: it.label || 'Position', price: it.price, box: it.box || null, dishId: it.dishId || null, mine: !!it.mine, done: false })),
+          items: state.items.map(it => ({ label: it.label || 'Position', price: it.price, box: it.box || null, dishId: it.dishId || null, mine: !!it.mine, king: !!it.king, done: false })),
           total: total(),
+          wishes: state.wishes.slice(),
           dineMode: state.dineMode,
           isVorbestellung: state.isVorbestellung,
           customerName: state.isVorbestellung ? (state.vorbestellName || null) : null,
@@ -1491,7 +1579,10 @@ function attachHandlers(){
     state.isVorbestellung = false;
     state.vorbestellName = '';
     state.vorbestellZeit = '';
+    state.wishes = [];
+    state.wishEntry = '';
     state.orderNumber = null;
+    state.orderMode = 'gerichte';
     render();
   }
 
@@ -1506,6 +1597,15 @@ function attachHandlers(){
 }
 
 render();
+
+// Haptisches Feedback bei JEDEM Button-Druck (kurze Vibration, falls das
+// Gerät es unterstützt — z. B. Android-Tablets; iPads vibrieren nicht).
+// Der Klickton beim Hinzufügen einer Position (playFeedback) bleibt extra.
+document.addEventListener('click', (ev)=>{
+  if(ev.target && ev.target.closest && ev.target.closest('button')){
+    try{ if(navigator.vibrate) navigator.vibrate(12); }catch(e){}
+  }
+}, true);
 
 // Service Worker registrieren — nötig, damit Chrome/Android "App
 // installieren" statt nur "Verknüpfung hinzufügen" anbietet.
@@ -1633,17 +1733,18 @@ function renderReadyToGo(orders){
 
 function fmtEURm(n){ return (n||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €'; }
 
-// Offene Vorbestellungen: sichtbar bis entweder bezahlt ODER von der Küche
-// als fertig/ausgegeben markiert wird (status "fertig") — je nachdem, was
-// zuerst passiert. "archiviert" (nach "Neue Session") wird ebenfalls
-// herausgefiltert. Eigene, einfache Gleichheits-Abfrage (kein Index nötig).
+// Offene Vorbestellungen: sichtbar, bis BEZAHLT wurde. Bewusst NICHT mehr
+// bei status "fertig" ausgeblendet — seit die Küche Bestellungen mit dem
+// letzten Haken automatisch abschließt, wäre die Vorbestellung sonst schon
+// aus dieser Liste verschwunden, bevor der Kunde bezahlt hat. "archiviert"
+// (nach "Neue Session") wird weiterhin herausgefiltert.
 function renderVorbestellungen(orders){
   const panel = document.getElementById('vorbestellPanel');
   const list = document.getElementById('vorbestellList');
   if(!panel || !list) return;
 
   const open = orders
-    .filter(o => !o.paid && o.status !== 'archiviert' && o.status !== 'fertig')
+    .filter(o => !o.paid && o.status !== 'archiviert')
     .sort((a,b) => (a.pickupTime||'').localeCompare(b.pickupTime||''));
 
   if(!open.length){
@@ -1714,20 +1815,16 @@ onSnapshot(vorbestellQuery, (snap) => {
   renderVorbestellungen(orders);
 }, (err) => console.error('"Offene Vorbestellungen": Verbindung zu Firestore fehlgeschlagen:', err));
 
-// REIS!-Alarm: gemeinsames Signal mit dem Küchenbildschirm.
+// REIS!-Alarm: wird von der KÜCHE ausgelöst — hier nur noch der Empfang
+// (Banner oben) plus Quittieren per "Nachgefüllt". Der eigene Auslöse-
+// Button ist bewusst weg, das Signal kommt vom Küchenbildschirm.
 const reisBanner = document.getElementById('reisBanner');
 const reisClearBtn = document.getElementById('reisClearBtn');
-const reisBtn = document.getElementById('reisBtn');
 onSnapshot(doc(db, 'alerts', 'reis'), (snap) => {
   const active = snap.exists() && snap.data().active;
   if(reisBanner) reisBanner.classList.toggle('show', !!active);
-  if(reisBtn) reisBtn.classList.toggle('active', !!active);
 }, (err) => console.error('REIS-Alarm: Verbindung fehlgeschlagen:', err));
 
-if(reisBtn) reisBtn.onclick = async ()=>{
-  try{ await setDoc(doc(db, 'alerts', 'reis'), { active: true, activatedAt: new Date().toISOString() }); }
-  catch(e){ console.error('REIS-Alarm konnte nicht ausgelöst werden:', e); }
-};
 if(reisClearBtn) reisClearBtn.onclick = async ()=>{
   try{ await setDoc(doc(db, 'alerts', 'reis'), { active: false }, { merge: true }); }
   catch(e){ console.error('REIS-Alarm konnte nicht quittiert werden:', e); }
