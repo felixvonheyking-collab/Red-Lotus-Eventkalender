@@ -55,7 +55,7 @@ button:hover{border-color:var(--gold)}
 <div class="top">
   <div>
     <h1>Streetfood-Karte</h1>
-    <p class="hint">Pflegt die Monatskarte auf redlotusstreetfood.com — Dokument <code>website/streetfood_karte</code></p>
+    <p class="hint">Pflegt die Wochenkarte auf redlotusstreetfood.com — Dokument <code>website/streetfood_karte</code></p>
   </div>
   <button id="logout" class="btn-ghost" hidden>Abmelden</button>
 </div>
@@ -73,8 +73,8 @@ button:hover{border-color:var(--gold)}
 </div>
 
 <div class="card" id="editor" hidden>
-  <label for="monat">Monat (z.&nbsp;B. „September")</label>
-  <input type="text" id="monat" spellcheck="false" autocomplete="off">
+  <label for="titel">Gültig für (frei — z.&nbsp;B. „KW 35", „24.–30. August" oder „Diese Woche")</label>
+  <input type="text" id="titel" spellcheck="false" autocomplete="off">
 
   <label>Gerichte (Reihenfolge = Reihenfolge auf der Website; Dauerbrenner steht dort automatisch oben)</label>
   <div id="zeilen"></div>
@@ -83,8 +83,12 @@ button:hover{border-color:var(--gold)}
     <span class="status">Stempel: BKK Bangkok · SEL Seoul · TYO Tokyo · HAN Hanoi · HKG Hongkong</span>
   </div>
 
-  <label>Stempel-Archiv („Wo wir schon waren" — beim Speichern eines neuen Monats wandert der alte automatisch hierher)</label>
+  <label>Stempel-Archiv („Wo wir schon waren" — komplett von Hand: kurze Kürzel wie BKK, SEL, TYO)</label>
   <div class="archiv" id="archiv"></div>
+  <div class="fuss">
+    <input type="text" id="archiv-neu" maxlength="6" placeholder="z. B. BKK" style="width:110px" spellcheck="false" autocomplete="off">
+    <button id="archiv-plus" type="button">+ Stempel</button>
+  </div>
 
   <div class="fuss">
     <button class="btn-primary" id="speichern">Auf Website veröffentlichen</button>
@@ -156,11 +160,6 @@ function archivZeichnen(){
   });
 }
 
-function kuerzel(monat){
-  const m = (monat||"").trim().split(/\s+/)[0].slice(0,3).toUpperCase();
-  return m || null;
-}
-
 async function laden(){
   const s = $("status");
   try{
@@ -168,13 +167,11 @@ async function laden(){
     $("zeilen").innerHTML = "";
     if(snap.exists()){
       const d = snap.data();
-      $("monat").value = d.monat || "";
-      $("monat").dataset.geladen = d.monat || "";
+      $("titel").value = d.titel || d.monat || ""; // d.monat: Altbestand aus Monats-Phase
       (d.gerichte||[]).forEach(g=>$("zeilen").appendChild(zeileHtml(g)));
       archiv = Array.isArray(d.archiv) ? d.archiv.slice() : [];
     } else {
-      $("monat").value = "";
-      $("monat").dataset.geladen = "";
+      $("titel").value = "";
       archiv = [];
       $("zeilen").appendChild(zeileHtml({name:"Loaded Fries", dauerbrenner:true}));
     }
@@ -188,8 +185,8 @@ async function laden(){
 
 async function speichern(){
   const s = $("status");
-  const monat = $("monat").value.trim();
-  if(!monat){ s.textContent = "Bitte Monat angeben."; s.className="status fehler"; return; }
+  const titel = $("titel").value.trim();
+  if(!titel){ s.textContent = "Bitte angeben, wofür die Karte gilt (z. B. KW 35)."; s.className="status fehler"; return; }
   const gerichte = [...$("zeilen").children].map(z=>({
     name: z.querySelector(".f-name").value.trim(),
     stempel: z.querySelector(".f-stempel").value,
@@ -201,22 +198,13 @@ async function speichern(){
   })).filter(g=>g.name);
   if(!gerichte.length){ s.textContent = "Mindestens ein Gericht mit Namen."; s.className="status fehler"; return; }
 
-  // Monatswechsel: alten Monat automatisch ins Archiv schieben
-  const vorher = $("monat").dataset.geladen || "";
-  if(vorher && vorher !== monat){
-    const k = kuerzel(vorher);
-    if(k && !archiv.includes(k)) archiv.push(k);
-  }
-
   s.textContent = "Speichere…"; s.className = "status";
   try{
     await setDoc(doc(db,"website","streetfood_karte"), {
       type: "streetfood_karte",
-      monat, gerichte, archiv,
+      titel, gerichte, archiv,
       updatedAt: serverTimestamp()
     });
-    $("monat").dataset.geladen = monat;
-    archivZeichnen();
     s.textContent = "Veröffentlicht ✓ (Website zeigt den Stand beim nächsten Laden)"; s.className = "status ok";
   }catch(e){
     s.textContent = "Speichern fehlgeschlagen: " + (e.message||e); s.className = "status fehler";
@@ -224,6 +212,13 @@ async function speichern(){
 }
 
 $("plus").onclick = ()=>$("zeilen").appendChild(zeileHtml());
+$("archiv-plus").onclick = ()=>{
+  const k = $("archiv-neu").value.trim().toUpperCase();
+  if(!k) return;
+  if(!archiv.includes(k)) archiv.push(k);
+  $("archiv-neu").value = "";
+  archivZeichnen();
+};
 $("speichern").onclick = speichern;
 $("btn-mail").onclick = async ()=>{
   const s = $("login-status"); s.textContent = "Anmelden…";
