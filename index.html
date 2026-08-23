@@ -1125,11 +1125,24 @@ function renderInventorySection(evt){
       <button type="button" class="btn ghost sm" id="invCopyFromBtn">Übernehmen</button>
     </div>
     <div class="hint">Übernimmt die komplette (bereits ergänzte) Liste dieses Termins als Startpunkt — deine Häkchen bei diesem Termin werden dabei zurückgesetzt, die Kernliste bleibt unverändert.</div>` : '';
+  const savedLists = Object.values(state.inventoryLists||{})
+    .filter(l=>Array.isArray(l.items) && l.items.length)
+    .sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
+  const applyListHtml = savedLists.length ? `
+    <div class="inv-add-row" style="margin-top:12px;">
+      <select id="invApplyListSelect">
+        <option value="">– Gespeicherte Liste übernehmen –</option>
+        ${savedLists.map(l=>`<option value="${l.id}">${escapeHtml(l.name||'Liste')} (${l.items.length} Punkte)</option>`).join('')}
+      </select>
+      <button type="button" class="btn ghost sm" id="invApplyListBtn">Übernehmen</button>
+    </div>
+    <div class="hint">Gespeicherte Listen verwaltest du im Reiter „Inventar".</div>` : '';
   return `
   <h3 style="margin-top:20px;">Inventarliste <span class="tag" style="opacity:.6;">${doneCount}/${items.length} abgehakt</span></h3>
   <div id="inventoryWrap">
     ${blocks}
     ${copyFromHtml}
+    ${applyListHtml}
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
       <button type="button" class="btn ghost sm" id="invResetChecksBtn">🔄 Häkchen zurücksetzen</button>
       <button type="button" class="btn ghost sm" id="invPrintBtn">🖨 Als PDF / Senden</button>
@@ -1177,6 +1190,97 @@ function renderInventoryCoreAdmin(){
   }).join('');
 }
 
+/* ============================= INVENTAR-REITER ============================= */
+// Eigener Reiter für alle Inventarlisten: Kernliste pflegen plus beliebig
+// viele benannte Listen (Firestore-Collection "inventoryLists") anlegen,
+// kopieren, abändern und gezielt einem Termin zuordnen.
+function renderInventoryListEditor(list){
+  const items = list.items || [];
+  return INV_CATS.map(cat=>{
+    const catItems = items.filter(it=>it.category===cat);
+    return `
+    <div class="sub-title" style="margin-top:${cat==='geraete'?'12px':'16px'};">${INV_CAT_LABELS[cat]}</div>
+    ${catItems.length ? catItems.map(it=>`
+      <div class="dish-item">
+        <span class="dname">${escapeHtml(it.name)}</span>
+        <button type="button" class="icon-btn" data-inv-list-del="${list.id}|${it.id}" title="Entfernen">✕</button>
+      </div>`).join('') : '<div class="hint">Noch keine Punkte in dieser Kategorie.</div>'}
+    <div class="inv-add-row">
+      <input type="text" data-inv-list-input="${list.id}|${cat}" placeholder="Neuer Punkt hinzufügen">
+      <button type="button" class="btn ghost sm" data-inv-list-add="${list.id}|${cat}">+ Hinzufügen</button>
+    </div>`;
+  }).join('');
+}
+function renderInventarTab(){
+  const lists = Object.values(state.inventoryLists||{}).sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
+  const upcoming = (state.events||[])
+    .filter(e=>INV_ELIGIBLE_CATS.includes(e.category||'event') && (e.date||'') >= todayISO())
+    .sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  const eventOptions = upcoming.map(ev=>`<option value="${ev.id}">${ev.date ? new Date(ev.date+'T00:00:00').toLocaleDateString('de-DE') : ''} · ${escapeHtml(ev.anlass||'Termin')} (${CATEGORY_LABELS[ev.category||'event']})</option>`).join('');
+  const pastWithInv = (state.events||[])
+    .filter(ev=>ev.inventory && Array.isArray(ev.inventory.items) && ev.inventory.items.length)
+    .sort((a,b)=>(b.date||'').localeCompare(a.date||''))
+    .slice(0,30);
+  const listCards = lists.length ? lists.map(l=>{
+    const open = state.invOpenListId===l.id;
+    const count = (l.items||[]).length;
+    return `
+    <div class="cat-block" style="margin-top:12px;">
+      <div class="cat-title" data-inv-list-toggle="${l.id}">
+        <span>${escapeHtml(l.name||'Unbenannte Liste')}</span>
+        <span class="tag">${open?'▲':'▼'} ${count} Punkte</span>
+      </div>
+      <div class="cat-body ${open?'open':''}">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+          <button type="button" class="btn ghost sm" data-inv-list-copy="${l.id}">📄 Kopieren</button>
+          <button type="button" class="btn ghost sm" data-inv-list-rename="${l.id}">✏️ Umbenennen</button>
+          <button type="button" class="btn danger sm" data-inv-list-delete="${l.id}">🗑 Löschen</button>
+        </div>
+        ${upcoming.length ? `
+        <div class="inv-add-row" style="margin-top:12px;">
+          <select data-inv-list-assign-select="${l.id}">
+            <option value="">– Termin auswählen –</option>
+            ${eventOptions}
+          </select>
+          <button type="button" class="btn gold sm" data-inv-list-assign="${l.id}">Termin zuordnen</button>
+        </div>
+        <div class="hint">Ersetzt die Inventarliste des gewählten Termins durch diese Liste (Häkchen starten frisch). Die Liste hier bleibt unverändert.</div>` : '<div class="hint" style="margin-top:10px;">Keine anstehenden Termine zum Zuordnen.</div>'}
+        ${renderInventoryListEditor(l)}
+      </div>
+    </div>`;
+  }).join('') : '<div class="empty-state" style="margin-top:12px;">Noch keine gespeicherten Listen — lege unten eine an oder kopiere die Kernliste.</div>';
+  return `
+  <div class="panel">
+    <h3>Gespeicherte Inventarlisten</h3>
+    <p class="hint" style="margin-bottom:12px;">Eigene Listen für wiederkehrende Situationen (z. B. „Festival groß", „Markt Winter"). Anlegen, kopieren, abändern — und von hier aus direkt einem Termin zuordnen.</p>
+    ${listCards}
+    <div class="sub-title" style="margin-top:20px;">Neue Liste anlegen</div>
+    <div class="inv-add-row">
+      <input type="text" id="invNewListName" placeholder="Name der neuen Liste, z. B. Festival groß">
+      <button type="button" class="btn ghost sm" id="invNewListEmptyBtn">+ Leere Liste</button>
+      <button type="button" class="btn ghost sm" id="invNewListFromCoreBtn">+ Kopie der Kernliste</button>
+    </div>
+    ${pastWithInv.length ? `
+    <div class="inv-add-row" style="margin-top:10px;">
+      <select id="invNewListFromEventSelect">
+        <option value="">– Liste eines Termins als Vorlage –</option>
+        ${pastWithInv.map(ev=>`<option value="${ev.id}">${ev.date ? new Date(ev.date+'T00:00:00').toLocaleDateString('de-DE') : ''} · ${escapeHtml(ev.anlass||'Termin')} (${ev.inventory.items.length} Punkte)</option>`).join('')}
+      </select>
+      <button type="button" class="btn ghost sm" id="invNewListFromEventBtn">Als neue Liste speichern</button>
+    </div>` : ''}
+  </div>
+  <div class="panel">
+    <h3>Inventar-Kernliste</h3>
+    <p class="hint" style="margin-bottom:12px;">Diese eine Liste wird automatisch für jeden neuen Event-/Wochenmarkt-/Festival-Termin übernommen (im Termin dann individuell ergänzbar/entfernbar, ohne die Kernliste hier zu verändern).</p>
+    ${renderInventoryCoreAdmin()}
+  </div>
+  <div class="panel">
+    <h3>Abhaken &amp; Arbeiten</h3>
+    <p class="hint" style="margin-bottom:12px;">Zum Abhaken am Einsatztag gibt es weiterhin die eigene Inventar-&amp;-Ablauf-Ansicht fürs Team.</p>
+    <a href="inventarablauf.html" class="btn gold sm" style="text-decoration:none;display:inline-block;">📋 Inventar &amp; Ablauf öffnen</a>
+  </div>`;
+}
+
 /* Thyme & Lime: eigener, komplett freier Katalog — nur "+"-Einträge mit
    manueller Preiseingabe, keine vordefinierten Gerichte/Preise. */
 const DISH_DB_TL = {
@@ -1221,6 +1325,11 @@ let state = {
   // Zentrale, wiederverwendbare Inventar-Kernliste für Wochenmärkte/Festivals
   // (einmal gepflegt, wird bei jedem neuen Termin automatisch übernommen).
   inventoryCore: { items: [] },
+  // Zusätzliche, benannte Inventarlisten (Inventar-Reiter): frei anlegbar,
+  // kopierbar, abänderbar und gezielt einem Termin zuordenbar. Ändert nichts
+  // am Kernlisten-Automatismus.
+  inventoryLists: {},   // id -> {id, name, items:[{id,category,name}], updatedAt}
+  invOpenListId: null,  // welche Liste im Inventar-Reiter gerade aufgeklappt ist
   invAdminOpen: false, // Kernliste-Verwaltung in den Einstellungen ein-/ausgeklappt
   newInvItemName: '', newInvItemCategory: 'geraete',
   newAblaufText: ''
@@ -1239,7 +1348,7 @@ function getDishConfigForCategory(cat){
 }
 
 /* ============================= FIRESTORE-SYNC & LOGIN ============================= */
-let unsubEvents=null, unsubCustom=[], unsubCustomTL=[], unsubMeta=null, unsubSettings=null, unsubRecipes=null, unsubManualHours=null, unsubInventoryCore=null;
+let unsubEvents=null, unsubCustom=[], unsubCustomTL=[], unsubMeta=null, unsubSettings=null, unsubRecipes=null, unsubManualHours=null, unsubInventoryCore=null, unsubInventoryLists=null;
 const CUSTOM_CATS = ['curry','andereReis','nudeln','vorspeisen','desserts'];
 const CUSTOM_CATS_TL = ['vorspeisen','hauptspeisen','desserts','snacks','streetfood','getraenke'];
 
@@ -1273,6 +1382,13 @@ function startFirestoreSync(){
     state.inventoryCore = d.exists() ? d.data() : { items: [] };
     render();
   }, err=>{ console.error('Firestore-Fehler (inventoryCore):', err); handleFirestoreError(err); });
+
+  unsubInventoryLists = onSnapshot(collection(db,'inventoryLists'), snap=>{
+    const lists = {};
+    snap.docs.forEach(d=>{ lists[d.id] = {id:d.id, ...d.data()}; });
+    state.inventoryLists = lists;
+    render();
+  }, err=>{ console.error('Firestore-Fehler (inventoryLists):', err); handleFirestoreError(err); });
 
   CUSTOM_CATS.forEach(catKey=>{
     const unsub = onSnapshot(doc(db,'customDishes',catKey), d=>{
@@ -1328,6 +1444,7 @@ function stopFirestoreSync(){
   unsubCustomTL.forEach(u=>u());
   unsubCustomTL=[];
   if(unsubRecipes) unsubRecipes();
+  if(unsubInventoryLists) unsubInventoryLists();
   if(unsubManualHours) unsubManualHours();
   if(unsubInventoryCore) unsubInventoryCore();
 }
@@ -1403,11 +1520,33 @@ async function deleteEventDoc(id){
 // "_websiteDocId" gemerkt, damit beim Standortwechsel oder Entmarkieren das
 // alte Dokument sauber gelöscht wird.
 //
-// Event/Sonstiges-News: ein Dokument pro Termin ("news_<eventId>") — keine
-// geteilten Slots nötig, jeder Termin hat höchstens eine eigene News.
+// News: ein Dokument pro Termin ("news_<eventId>") — keine geteilten Slots
+// nötig, jeder Termin hat höchstens eine eigene News. Gilt für Event,
+// Sonstiges und Wochenmarkt (Wochenmarkt zusätzlich zum Speiseplan-Dokument,
+// z. B. für Sondertermine mit Veranstaltungsposter).
+async function syncNewsDocForEvent(event){
+  const docId = 'news_'+event.id;
+  const text = (event.publicText||'').trim();
+  if(event.showAsNews && text){
+    const data = {
+      type: 'news',
+      titel: event.anlass || '',
+      text,
+      datumVon: event.date || '',
+      tag: WEBSITE_NEWS_TAGS.includes(event.publicTag) ? event.publicTag : 'Event',
+      updatedAt: serverTimestamp()
+    };
+    if(event.publicDatumBis) data.datumBis = event.publicDatumBis;
+    if(event.publicImage) data.bild = event.publicImage;
+    await setDoc(doc(db,'website',docId), data);
+  } else {
+    await deleteDoc(doc(db,'website',docId)).catch(e=>console.warn('Nebenaufgabe fehlgeschlagen (index):', e));
+  }
+}
 async function syncWebsiteForEvent(event){
   try{
     if(event.category==='wochenmarkt'){
+      await syncNewsDocForEvent(event);
       const checked = (event.dishes||[]).filter(d=>d.showOnWebsite);
       const ort = event.marketOrt || '';
       const prevDocId = event._websiteDocId || null;
@@ -1438,22 +1577,7 @@ async function syncWebsiteForEvent(event){
         }
       }
     } else if(event.category==='event' || event.category==='sonstiges'){
-      const docId = 'news_'+event.id;
-      const text = (event.publicText||'').trim();
-      if(event.showAsNews && text){
-        const data = {
-          type: 'news',
-          titel: event.anlass || '',
-          text,
-          datumVon: event.date || '',
-          tag: WEBSITE_NEWS_TAGS.includes(event.publicTag) ? event.publicTag : 'Event',
-          updatedAt: serverTimestamp()
-        };
-        if(event.publicDatumBis) data.datumBis = event.publicDatumBis;
-        await setDoc(doc(db,'website',docId), data);
-      } else {
-        await deleteDoc(doc(db,'website',docId)).catch(e=>console.warn('Nebenaufgabe fehlgeschlagen (index):', e));
-      }
+      await syncNewsDocForEvent(event);
     }
   }catch(e){
     console.error('Website-Sync-Fehler:', e);
@@ -1466,8 +1590,11 @@ async function syncWebsiteForEvent(event){
 async function clearWebsiteForEvent(event){
   if(!event) return;
   try{
-    if(event.category==='wochenmarkt' && event._websiteDocId){
-      await deleteDoc(doc(db,'website',event._websiteDocId)).catch(e=>console.warn('Nebenaufgabe fehlgeschlagen (index):', e));
+    if(event.category==='wochenmarkt'){
+      if(event._websiteDocId){
+        await deleteDoc(doc(db,'website',event._websiteDocId)).catch(e=>console.warn('Nebenaufgabe fehlgeschlagen (index):', e));
+      }
+      await deleteDoc(doc(db,'website','news_'+event.id)).catch(e=>console.warn('Nebenaufgabe fehlgeschlagen (index):', e));
     } else if(event.category==='event' || event.category==='sonstiges'){
       await deleteDoc(doc(db,'website','news_'+event.id)).catch(e=>console.warn('Nebenaufgabe fehlgeschlagen (index):', e));
     }
@@ -1525,6 +1652,37 @@ async function saveSettingsDoc(){
 async function saveInventoryCoreDoc(){
   try{ await setDoc(doc(db,'settings','inventoryCore'), state.inventoryCore); }
   catch(e){ console.error('Fehler beim Speichern der Inventar-Kernliste:', e); markStorageIssue(); }
+}
+async function saveInventoryListDoc(list){
+  try{
+    list.updatedAt = new Date().toISOString();
+    await setDoc(doc(db,'inventoryLists',list.id), list);
+  }
+  catch(e){ console.error('Fehler beim Speichern der Inventarliste:', e); markStorageIssue(); showToast('Liste NICHT gespeichert: '+(e.message||e), true); }
+}
+async function deleteInventoryListDoc(id){
+  try{ await deleteDoc(doc(db,'inventoryLists',id)); }
+  catch(e){ console.error('Fehler beim Löschen der Inventarliste:', e); markStorageIssue(); }
+}
+// Ordnet eine gespeicherte Liste einem Termin zu: ersetzt dessen komplette
+// Inventarliste (Häkchen starten frisch). Schreibt nur das inventory-Feld
+// (merge), damit parallele Änderungen am Termin nicht überschrieben werden.
+async function assignInventoryListToEvent(list, evt){
+  const inv = {
+    items: (list.items||[]).map(it=>({ id: uid(), category: it.category, name: it.name, checked:false, core:false })),
+    seededAt: new Date().toISOString(),
+    fromListName: list.name || ''
+  };
+  try{
+    await setDoc(doc(db,'events',evt.id), { inventory: inv }, {merge:true});
+    const local = state.events.find(x=>x.id===evt.id);
+    if(local) local.inventory = inv;
+    showToast('Liste „'+(list.name||'')+'" dem Termin „'+(evt.anlass||'Termin')+'" zugeordnet ✓', false);
+  }catch(e){
+    console.error('Fehler beim Zuordnen der Inventarliste:', e);
+    markStorageIssue();
+    showToast('Zuordnen fehlgeschlagen: '+(e.message||e), true);
+  }
 }
 
 /* Bilder vor dem Speichern verkleinern/komprimieren, damit Firestore-Dokumente
@@ -1775,7 +1933,7 @@ function render(){
 
   app.innerHTML = `
     ${renderHeader()}
-    ${state.tab==='kalender' ? renderKalenderTab() : renderEinstellungenTab()}
+    ${state.tab==='kalender' ? renderKalenderTab() : state.tab==='inventar' ? renderInventarTab() : renderEinstellungenTab()}
   `;
   attachGlobalHandlers();
 
@@ -1808,6 +1966,7 @@ function renderHeader(){
     </div>
     <nav class="tabs">
       <button type="button" data-tab="kalender" class="${state.tab==='kalender'?'active':''}">Kalender</button>
+      <button type="button" data-tab="inventar" class="${state.tab==='inventar'?'active':''}">Inventar</button>
       <button type="button" data-tab="einstellungen" class="${state.tab==='einstellungen'?'active':''}">Einstellungen</button>
       <a href="einkaufsliste.html" class="btn ghost" style="text-decoration:none;display:inline-flex;align-items:center;" title="Einkaufsliste">🛒</a>
       <a href="inventarablauf.html" class="btn ghost" style="text-decoration:none;display:inline-flex;align-items:center;" title="Inventar &amp; Ablauf">📋</a>
@@ -1977,8 +2136,10 @@ function renderTeamSection(e){
   `;
 }
 
-// Öffentliche News-Felder für die Website — nur bei Kategorie "Event" und
-// "Sonstiges" verfügbar (siehe renderEventLikeFields/renderSonstigesFields).
+// Öffentliche News-Felder für die Website — bei Kategorie "Event", "Sonstiges"
+// und "Wochenmarkt" verfügbar (siehe renderEventLikeFields/renderSonstigesFields/
+// renderWochenmarktFields). Inklusive optionalem Veranstaltungsposter, das als
+// komprimiertes Bild direkt im news-Dokument der website-Collection landet.
 function renderNewsFields(e){
   return `
     <div class="field">
@@ -1994,6 +2155,16 @@ function renderNewsFields(e){
         <select id="f-news-tag">${WEBSITE_NEWS_TAGS.map(t=>`<option value="${t}" ${(e.publicTag||'Event')===t?'selected':''}>${t}</option>`).join('')}</select>
       </div>
       <div class="field"><label>Bis (optional)</label><input type="date" id="f-news-bis" value="${e.publicDatumBis||''}"></div>
+    </div>
+    <div class="field">
+      <label>Poster / Bild (optional)</label>
+      ${e.publicImage ? `
+      <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:8px;">
+        <img src="${e.publicImage}" alt="Veranstaltungsposter" style="max-width:140px;max-height:180px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);">
+        <button type="button" class="btn ghost sm" id="f-news-img-remove">Bild entfernen</button>
+      </div>` : ''}
+      <input type="file" id="f-news-img" accept="image/*">
+      <div class="hint">Erscheint als anklickbares Poster bei der News auf der Website. Wird automatisch verkleinert.</div>
     </div>
     <div class="hint">Titel und Datum übernimmt die Website automatisch aus Anlass/Datum oben.</div>
     ` : ''}
@@ -2036,7 +2207,8 @@ function renderWochenmarktFields(e){
         ${WEBSITE_ORT_OPTIONS.map(o=>`<option value="${o}" ${e.marketOrt===o?'selected':''}>${o}</option>`).join('')}
       </select>
       <div class="hint">Nur nötig, wenn unten Gerichte mit "Auf Website zeigen" markiert werden.</div>
-    </div>` : ''}
+    </div>
+    ${renderNewsFields(e)}` : ''}
 
     <h3 style="margin-top:20px;">${gerichteLabel} auswählen</h3>
     <div id="dishAccordionWrap">${getActiveDishConfig().catOrder.map(catKey=>renderCatBlock(catKey)).join('')}</div>
@@ -2294,9 +2466,9 @@ function renderEinstellungenTab(){
     </div>
   </div>
   <div class="panel">
-    <h3>Inventar-Kernliste</h3>
-    <p class="hint" style="margin-bottom:12px;">Diese eine Liste wird automatisch für jeden neuen Event-/Wochenmarkt-/Festival-Termin übernommen (im Termin dann individuell ergänzbar/entfernbar, ohne die Kernliste hier zu verändern).</p>
-    ${renderInventoryCoreAdmin()}
+    <h3>Inventarlisten</h3>
+    <p class="hint" style="margin-bottom:12px;">Kernliste und gespeicherte Listen sind in den eigenen Reiter „Inventar" oben umgezogen — dort anlegen, kopieren, abändern und Terminen zuordnen.</p>
+    <button type="button" class="btn gold sm" data-tab="inventar">📋 Zum Inventar-Reiter</button>
   </div>
   <div class="panel">
     <h3>Google Kalender</h3>
@@ -2545,6 +2717,21 @@ function attachGlobalHandlers(){
     if(newsTagEl) newsTagEl.onchange = ()=>{ state.editingEvent.publicTag = newsTagEl.value; };
     const newsBisEl = document.getElementById('f-news-bis');
     if(newsBisEl) newsBisEl.oninput = ()=>{ state.editingEvent.publicDatumBis = newsBisEl.value; };
+    // Poster-Upload: kräftig komprimieren, damit das Bild sicher unter dem
+    // Firestore-Dokumentlimit (1 MB) bleibt — Poster sollen lesbar sein,
+    // deshalb erste Stufe größer als bei den internen Gericht-Fotos.
+    const newsImgEl = document.getElementById('f-news-img');
+    if(newsImgEl) newsImgEl.onchange = async (ev)=>{
+      const file = ev.target.files[0];
+      if(!file) return;
+      let dataUrl = await compressImageFile(file, 1100, 0.72);
+      if(dataUrl.length > 700000) dataUrl = await compressImageFile(file, 850, 0.62);
+      if(dataUrl.length > 700000) dataUrl = await compressImageFile(file, 650, 0.55);
+      state.editingEvent.publicImage = dataUrl;
+      render();
+    };
+    const newsImgDelEl = document.getElementById('f-news-img-remove');
+    if(newsImgDelEl) newsImgDelEl.onclick = ()=>{ state.editingEvent.publicImage = null; render(); };
 
     const delBtn = document.getElementById('deleteEventBtn');
     if(delBtn) delBtn.onclick = ()=>{
@@ -2634,6 +2821,20 @@ function attachGlobalHandlers(){
         e.inventory = {
           items: src.inventory.items.map(it=>({ id: uid(), category: it.category, name: it.name, checked:false, core: !!it.core })),
           seededAt: new Date().toISOString()
+        };
+        saveEventDoc(e);
+        render();
+      };
+      const invApplyListBtn = document.getElementById('invApplyListBtn');
+      if(invApplyListBtn) invApplyListBtn.onclick = ()=>{
+        const sel = document.getElementById('invApplyListSelect');
+        const list = sel && state.inventoryLists[sel.value];
+        if(!list) return;
+        if(!confirm('Aktuelle Inventarliste dieses Termins durch „'+(list.name||'Liste')+'" ersetzen? Eigene Häkchen/Ergänzungen bei diesem Termin gehen dabei verloren.')) return;
+        e.inventory = {
+          items: (list.items||[]).map(it=>({ id: uid(), category: it.category, name: it.name, checked:false, core:false })),
+          seededAt: new Date().toISOString(),
+          fromListName: list.name || ''
         };
         saveEventDoc(e);
         render();
@@ -2731,6 +2932,99 @@ function attachGlobalHandlers(){
       saveInventoryCoreDoc();
       render();
     };
+  });
+
+  // Inventar-Reiter: gespeicherte Listen anlegen/kopieren/abändern/zuordnen
+  const createInvList = (name, items)=>{
+    const list = {
+      id: uid(),
+      name: (name||'').trim() || 'Neue Liste',
+      items: (items||[]).map(it=>({ id: uid(), category: it.category, name: it.name }))
+    };
+    state.inventoryLists[list.id] = list;
+    state.invOpenListId = list.id;
+    saveInventoryListDoc(list);
+    render();
+  };
+  const invNewListNameVal = ()=>{
+    const inp = document.getElementById('invNewListName');
+    return inp ? inp.value : '';
+  };
+  const newEmptyBtn = document.getElementById('invNewListEmptyBtn');
+  if(newEmptyBtn) newEmptyBtn.onclick = ()=> createInvList(invNewListNameVal(), []);
+  const newFromCoreBtn = document.getElementById('invNewListFromCoreBtn');
+  if(newFromCoreBtn) newFromCoreBtn.onclick = ()=> createInvList(invNewListNameVal() || 'Kernliste (Kopie)', (state.inventoryCore&&state.inventoryCore.items)||[]);
+  const newFromEventBtn = document.getElementById('invNewListFromEventBtn');
+  if(newFromEventBtn) newFromEventBtn.onclick = ()=>{
+    const sel = document.getElementById('invNewListFromEventSelect');
+    const src = sel && state.events.find(x=>x.id===sel.value);
+    if(!src || !src.inventory || !Array.isArray(src.inventory.items)) return;
+    createInvList(invNewListNameVal() || (src.anlass||'Termin')+' (Vorlage)', src.inventory.items);
+  };
+  document.querySelectorAll('[data-inv-list-toggle]').forEach(el=>el.onclick=()=>{
+    const id = el.dataset.invListToggle;
+    state.invOpenListId = (state.invOpenListId===id) ? null : id;
+    render();
+  });
+  document.querySelectorAll('[data-inv-list-copy]').forEach(btn=>btn.onclick=()=>{
+    const src = state.inventoryLists[btn.dataset.invListCopy];
+    if(!src) return;
+    createInvList((src.name||'Liste')+' (Kopie)', src.items||[]);
+  });
+  document.querySelectorAll('[data-inv-list-rename]').forEach(btn=>btn.onclick=()=>{
+    const list = state.inventoryLists[btn.dataset.invListRename];
+    if(!list) return;
+    const name = prompt('Neuer Name für diese Liste:', list.name||'');
+    if(name===null) return;
+    list.name = name.trim() || list.name;
+    saveInventoryListDoc(list);
+    render();
+  });
+  document.querySelectorAll('[data-inv-list-delete]').forEach(btn=>btn.onclick=()=>{
+    const list = state.inventoryLists[btn.dataset.invListDelete];
+    if(!list) return;
+    if(!confirm('Liste „'+(list.name||'')+'" wirklich löschen? Bereits zugeordnete Termine behalten ihre Kopie.')) return;
+    delete state.inventoryLists[list.id];
+    if(state.invOpenListId===list.id) state.invOpenListId=null;
+    deleteInventoryListDoc(list.id);
+    render();
+  });
+  document.querySelectorAll('[data-inv-list-assign]').forEach(btn=>btn.onclick=()=>{
+    const list = state.inventoryLists[btn.dataset.invListAssign];
+    const sel = document.querySelector(`[data-inv-list-assign-select="${btn.dataset.invListAssign}"]`);
+    const evt = sel && state.events.find(x=>x.id===sel.value);
+    if(!list) return;
+    if(!evt){ showToast('Bitte zuerst einen Termin auswählen.', true); return; }
+    if(!confirm('Inventarliste des Termins „'+(evt.anlass||'Termin')+'" durch „'+(list.name||'')+'" ersetzen? Vorhandene Häkchen/Ergänzungen des Termins gehen verloren.')) return;
+    assignInventoryListToEvent(list, evt).then(()=>render());
+  });
+  document.querySelectorAll('[data-inv-list-add]').forEach(btn=>btn.onclick=()=>{
+    const [listId, cat] = btn.dataset.invListAdd.split('|');
+    const list = state.inventoryLists[listId];
+    const input = document.querySelector(`[data-inv-list-input="${listId}|${cat}"]`);
+    const name = input && input.value.trim();
+    if(!list || !name) return;
+    list.items = list.items || [];
+    list.items.push({ id: uid(), category: cat, name });
+    saveInventoryListDoc(list);
+    render();
+  });
+  document.querySelectorAll('[data-inv-list-input]').forEach(inp=>{
+    inp.onkeydown = (ev)=>{
+      if(ev.key==='Enter'){
+        ev.preventDefault();
+        const btn = document.querySelector(`[data-inv-list-add="${inp.dataset.invListInput}"]`);
+        if(btn) btn.click();
+      }
+    };
+  });
+  document.querySelectorAll('[data-inv-list-del]').forEach(btn=>btn.onclick=()=>{
+    const [listId, itemId] = btn.dataset.invListDel.split('|');
+    const list = state.inventoryLists[listId];
+    if(!list) return;
+    list.items = (list.items||[]).filter(it=>it.id!==itemId);
+    saveInventoryListDoc(list);
+    render();
   });
 
   const rmLogo = document.getElementById('removeLogoBtn');
