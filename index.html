@@ -3701,11 +3701,15 @@ function openOfferPrint(evt, opts){
   const foodNetto = dishTotalBrutto / 1.07;
   const foodUnitBrutto = dishTotalBrutto / people;
   const foodUnitNetto = foodNetto / people;
-  const nebenNetto = nebenkosten / 1.19;
+  // Nebenkostenpauschale: unselbständige Nebenleistung zur Speisen-/
+  // Catering-Leistung — teilt deren Steuersatz und wird seit 01.01.2026
+  // wie die Speisen mit 7 % besteuert (vorher 19 %). Getränke wären
+  // weiterhin 19 %, tauchen auf dieser Rechnung aber nicht auf.
+  const nebenNetto = nebenkosten / 1.07;
 
   const nettoGesamt = foodNetto + nebenNetto;
   const mwstFood = foodNetto * 0.07;
-  const mwstNeben = nebenNetto * 0.19;
+  const mwstNeben = nebenNetto * 0.07;
   const bruttoGesamt = dishTotalBrutto + nebenkosten;
 
   const groups = dishesByInvoiceGroup(src);
@@ -3770,7 +3774,7 @@ function openOfferPrint(evt, opts){
             <td style="text-align:right;" id="nebenNetto" contenteditable="true">${fmtEUR(nebenNetto)}</td>
             <td style="text-align:center;">1</td>
             <td style="text-align:right;" id="nebenBrutto" contenteditable="true">${fmtEUR(nebenkosten)}</td>
-            <td style="text-align:center;">19 %</td>
+            <td style="text-align:center;">7 %</td>
           </tr>
         </tbody>
       </table>
@@ -3781,7 +3785,7 @@ function openOfferPrint(evt, opts){
           <tr><td>Nettopreis gesamt (Position 2)</td><td style="text-align:right;" id="posNetto2">${fmtEUR(nebenNetto)}</td></tr>
           <tr class="inv-total-row"><td><b>Nettopreis gesamt</b></td><td style="text-align:right;" id="sumNetto"><b>${fmtEUR(nettoGesamt)}</b></td></tr>
           <tr><td>MwSt. Catering 7%</td><td style="text-align:right;" id="sumMwstFood">${fmtEUR(mwstFood)}</td></tr>
-          <tr><td>MwSt. Nebenkosten 19%</td><td style="text-align:right;" id="sumMwstNeben">${fmtEUR(mwstNeben)}</td></tr>
+          <tr><td>MwSt. Nebenkosten 7%</td><td style="text-align:right;" id="sumMwstNeben">${fmtEUR(mwstNeben)}</td></tr>
           <tr class="inv-total-row"><td><b>Gesamtbetrag inkl. Nebenkosten</b></td><td style="text-align:right;" id="sumBrutto"><b>${fmtEUR(bruttoGesamt)}</b></td></tr>
         </tbody>
       </table>
@@ -3822,10 +3826,10 @@ function openOfferPrint(evt, opts){
 
     const posFoodBruttoTotal = foodBrutto * foodQtyVal;
     const posFoodNetto = posFoodBruttoTotal / 1.07;
-    const posNebenNetto = nebenBruttoVal / 1.19;
+    const posNebenNetto = nebenBruttoVal / 1.07; // Nebenleistung: 7 % wie die Speisen (seit 01.01.2026)
     const gesamtNetto = posFoodNetto + posNebenNetto;
     const mwstFoodVal = posFoodNetto * 0.07;
-    const mwstNebenVal = posNebenNetto * 0.19;
+    const mwstNebenVal = posNebenNetto * 0.07;
     const gesamtBrutto = posFoodBruttoTotal + nebenBruttoVal;
 
     document.getElementById('foodUnitNetto').textContent = fmtEUR(foodBrutto/1.07);
