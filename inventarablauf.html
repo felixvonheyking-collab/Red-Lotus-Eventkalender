@@ -134,6 +134,21 @@ header.top{
 .ablauf-row .ar-text{flex:1;background:transparent;border:none;color:var(--cream);font-size:13.5px;padding:4px 2px;font-family:'Work Sans',sans-serif;}
 .ablauf-row.done .ar-text{opacity:0.5;text-decoration:line-through;}
 .ablauf-row .ar-move{background:none;border:none;color:var(--gold-soft);opacity:0.6;cursor:pointer;font-size:13px;padding:2px 5px;}
+/* Uhrzeit am Ablaufpunkt — feste Breite, damit die Zeiten eine Spalte bilden.
+   Breit genug für "03:00 PM", falls das Gerät englische Zeitdarstellung nutzt. */
+.ar-time{
+  width:104px;flex-shrink:0;background:transparent;border:1px solid transparent;
+  color:var(--gold);font-size:13px;font-variant-numeric:tabular-nums;
+  font-family:'Work Sans',sans-serif;padding:3px 4px;border-radius:6px;text-align:center;
+}
+.ar-time:hover,.ar-time:focus{border-color:var(--line);}
+.ar-time::-webkit-calendar-picker-indicator{opacity:.35;padding:0;margin-left:2px;}
+.ar-time::-webkit-calendar-picker-indicator:hover{opacity:.8;cursor:pointer;}
+.ablauf-row.done .ar-time{opacity:0.5;}
+.ablauf-sep{
+  font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--gold-soft);
+  opacity:0.65;padding:12px 4px 4px;border-bottom:1px dashed var(--line);
+}
 .ablauf-row .ar-move:disabled{opacity:0.2;cursor:default;}
 
 /* LOGIN */
@@ -162,8 +177,21 @@ header.top{
   .no-print{display:none !important;}
   body{background:#fff;color:#000;}
   .panel{box-shadow:none;border:1px solid #ccc;}
+  /* Das Zeitfeld ist am Bildschirm ein Eingabefeld, auf Papier soll es eine
+     schlichte Zahl sein — ohne Rahmen, ohne den nativen Uhr-Knopf. */
+  .ablauf-row .ar-time{color:#000;border:none;width:56px;text-align:left;padding-left:0;}
+  .ablauf-row .ar-time::-webkit-calendar-picker-indicator{display:none;}
+  .ablauf-sep{color:#555;border-bottom-color:#ccc;}
 }
 @media (max-width:600px){
+  /* Siehe index.html: schmaleres Zeitfeld, damit der Ablauftext auf dem
+     Telefon nicht abgeschnitten wird. Hier darf er zusätzlich umbrechen —
+     der Text steht in dieser Ansicht als Beschriftung, nicht als Eingabe. */
+  .ar-time{width:58px;padding:3px 2px;font-size:12.5px;}
+  .ar-time::-webkit-calendar-picker-indicator{display:none;}
+  .ablauf-row{gap:4px;align-items:flex-start;}
+  .ablauf-row .ar-text{white-space:normal;line-height:1.35;padding-top:2px;}
+  .ablauf-row input[type=checkbox],.ablauf-row .ar-time{margin-top:1px;}
   .app{padding:12px 8px 70px;}
   header.top{padding:10px 12px;}
   .brand h1{font-size:16px;}
@@ -319,20 +347,44 @@ async function removeAblaufItem(evt, itemId){
   const items = abl.items.filter(it=>it.id!==itemId);
   await updateDoc(doc(db,'events', evt.id), { ablauf: { items } });
 }
-async function addAblaufItem(evt, text){
+async function addAblaufItem(evt, text, time){
   if(!text || !text.trim()) return;
   const abl = await ensureAblauf(evt);
-  const items = [...abl.items, { id: uid(), text: text.trim(), checked:false }];
+  const items = [...abl.items, { id: uid(), time: time||'', text: text.trim(), checked:false }];
   await updateDoc(doc(db,'events', evt.id), { ablauf: { items } });
 }
+async function setAblaufItemTime(evt, itemId, time){
+  const abl = await ensureAblauf(evt);
+  const items = abl.items.map(it=> it.id===itemId ? {...it, time: time||''} : it);
+  await updateDoc(doc(db,'events', evt.id), { ablauf: { items } });
+}
+async function resetAblaufChecks(evt){
+  const abl = await ensureAblauf(evt);
+  const items = abl.items.map(it=>({...it, checked:false}));
+  await updateDoc(doc(db,'events', evt.id), { ablauf: { items } });
+}
+// ↑/↓ betrifft nur noch die Punkte ohne Uhrzeit (alles mit Zeit steht
+// chronologisch). Getauscht werden deshalb die Array-Positionen der beiden
+// zeitlosen Nachbarn — siehe dieselbe Logik in index.html.
 async function moveAblaufItem(evt, itemId, dir){
   const abl = await ensureAblauf(evt);
   const items = [...abl.items];
-  const idx = items.findIndex(it=>it.id===itemId);
-  const swapWith = idx + dir;
-  if(idx<0 || swapWith<0 || swapWith>=items.length) return;
-  [items[idx], items[swapWith]] = [items[swapWith], items[idx]];
+  const positionen = items.map((it,i)=>({it,i})).filter(x=>!x.it.time);
+  const platz = positionen.findIndex(x=>x.it.id===itemId);
+  const ziel = platz + dir;
+  if(platz<0 || ziel<0 || ziel>=positionen.length) return;
+  const a = positionen[platz].i, b = positionen[ziel].i;
+  [items[a], items[b]] = [items[b], items[a]];
   await updateDoc(doc(db,'events', evt.id), { ablauf: { items } });
+}
+// Anzeige-Reihenfolge: erst chronologisch, dann die Punkte ohne feste Zeit.
+// Reine Sortierung fürs Rendern — der Datensatz bleibt unangetastet, damit
+// alte Ablauflisten ohne Zeitfeld sich exakt wie bisher verhalten.
+function sortAblaufItems(items){
+  const mitZeit = [], ohneZeit = [];
+  (items||[]).forEach((it,idx)=>{ (it.time ? mitZeit : ohneZeit).push({it,idx}); });
+  mitZeit.sort((a,b)=> a.it.time.localeCompare(b.it.time) || a.idx-b.idx);
+  return { mitZeit: mitZeit.map(x=>x.it), ohneZeit: ohneZeit.map(x=>x.it) };
 }
 
 /* ============================= LOGIN ============================= */
@@ -446,21 +498,34 @@ function renderInventorySection(evt){
 }
 function renderAblaufSection(evt){
   const items = (evt.ablauf && evt.ablauf.items) || [];
-  return `
-  <div class="panel">
-    <h3>Ablaufliste</h3>
-    ${items.length ? items.map((it,idx)=>`
+  const { mitZeit, ohneZeit } = sortAblaufItems(items);
+  const doneCount = items.filter(it=>it.checked).length;
+  // Am Einsatztag wird hier vor allem abgehakt. Die Uhrzeit ist deshalb ein
+  // ruhiger Anker links neben dem Text, änderbar per Antippen.
+  const zeile = (it, o)=>`
       <div class="ablauf-row ${it.checked?'done':''}">
         <input type="checkbox" data-ablauf-check="${it.id}" ${it.checked?'checked':''}>
+        <input type="time" class="ar-time" data-ablauf-time="${it.id}" value="${escapeHtml(it.time||'')}" title="Uhrzeit (optional)">
         <span class="ar-text" style="flex:1;">${escapeHtml(it.text)}</span>
-        <button type="button" class="ar-move no-print" data-ablauf-up="${it.id}" title="Nach oben" ${idx===0?'disabled':''}>↑</button>
-        <button type="button" class="ar-move no-print" data-ablauf-down="${it.id}" title="Nach unten" ${idx===items.length-1?'disabled':''}>↓</button>
+        ${o && o.showMove ? `
+        <button type="button" class="ar-move no-print" data-ablauf-up="${it.id}" title="Nach oben" ${o.first?'disabled':''}>↑</button>
+        <button type="button" class="ar-move no-print" data-ablauf-down="${it.id}" title="Nach unten" ${o.last?'disabled':''}>↓</button>` : ''}
         <button type="button" class="icon-btn no-print" data-ablauf-remove="${it.id}" title="Entfernen">✕</button>
-      </div>`).join('') : '<div class="hint">Noch keine Punkte — z. B. „Aufbau ab 7 Uhr", „Kasse startklar machen", „Abbau um 15 Uhr".</div>'}
+      </div>`;
+  return `
+  <div class="panel">
+    <h3>Ablaufliste ${items.length?`<span class="tag" style="opacity:.6;">${doneCount}/${items.length} erledigt</span>`:''}</h3>
+    ${items.length ? `
+      ${mitZeit.map(it=>zeile(it,{showMove:false})).join('')}
+      ${ohneZeit.length ? `${mitZeit.length?'<div class="ablauf-sep">Ohne feste Uhrzeit</div>':''}
+        ${ohneZeit.map((it,i)=>zeile(it,{showMove:true,first:i===0,last:i===ohneZeit.length-1})).join('')}` : ''}
+    ` : '<div class="hint">Noch keine Punkte — z. B. „07:00 Aufbau", „09:30 Kasse startklar", „15:00 Abbau". Die Uhrzeit ist optional; Punkte ohne Zeit sammeln sich unten.</div>'}
     <div class="inv-add-row no-print">
+      <input type="time" id="ablaufNewTime" class="ar-time" style="border-color:var(--line);" title="Uhrzeit (optional)">
       <input type="text" id="ablaufNewText" placeholder="Neuer Ablaufpunkt">
       <button type="button" class="btn ghost sm" id="ablaufAddBtn">+ Hinzufügen</button>
     </div>
+    ${items.length?'<div class="inv-add-row no-print"><button type="button" class="btn ghost sm" id="ablaufResetChecksBtn">🔄 Häkchen zurücksetzen</button></div>':''}
   </div>`;
 }
 function renderApp(){
@@ -558,10 +623,22 @@ function attachAppHandlers(){
   document.querySelectorAll('[data-ablauf-down]').forEach(btn=>{
     btn.onclick = ()=> moveAblaufItem(evt, btn.getAttribute('data-ablauf-down'), 1);
   });
+  document.querySelectorAll('[data-ablauf-time]').forEach(inp=>{
+    inp.onchange = ()=> setAblaufItemTime(evt, inp.getAttribute('data-ablauf-time'), inp.value);
+  });
+  const ablaufResetBtn = document.getElementById('ablaufResetChecksBtn');
+  if(ablaufResetBtn) ablaufResetBtn.onclick = ()=>{
+    if(confirm('Alle Häkchen im Ablauf zurücksetzen?')) resetAblaufChecks(evt);
+  };
   const ablaufAddBtn = document.getElementById('ablaufAddBtn');
   const ablaufNewText = document.getElementById('ablaufNewText');
+  const ablaufNewTime = document.getElementById('ablaufNewTime');
   if(ablaufAddBtn && ablaufNewText){
-    ablaufAddBtn.onclick = ()=>{ addAblaufItem(evt, ablaufNewText.value); ablaufNewText.value=''; };
+    ablaufAddBtn.onclick = ()=>{
+      addAblaufItem(evt, ablaufNewText.value, ablaufNewTime && ablaufNewTime.value);
+      ablaufNewText.value='';
+      if(ablaufNewTime) ablaufNewTime.value='';
+    };
     ablaufNewText.onkeydown = (ev)=>{ if(ev.key==='Enter'){ ev.preventDefault(); ablaufAddBtn.click(); } };
   }
 }
