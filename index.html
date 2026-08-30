@@ -253,6 +253,30 @@ a.link-chip:hover{color:#fff;}
 .cat-title .tag{font-size:11px;color:var(--gold-soft);opacity:0.7;font-weight:400;}
 .cat-body{padding:12px 14px;display:none;background:var(--ink-3);}
 .cat-body.open{display:block;}
+/* ---------- Einklappbare Abschnitte im Termin-Formular ----------
+   Das Formular war eine durchgehende Scrollstrecke: Kategorie, Felder,
+   Team, Gerichte, Inventar, Ablauf — alles gleichzeitig offen. Die langen
+   Abschnitte sind jetzt Kästen, die zugeklappt starten; die Kopfzeile sagt,
+   was drinsteht ("5 Punkte · 1 erledigt"), damit Zuklappen nichts versteckt.
+   Bewusst kräftiger als .cat-block: das hier gliedert das Formular,
+   .cat-block gliedert Listen INNERHALB eines Abschnitts. */
+.form-section{border:1px solid var(--line);border-radius:12px;margin-top:20px;overflow:hidden;background:var(--ink-2);}
+.fs-head{
+  width:100%;display:flex;align-items:center;gap:10px;
+  background:none;border:none;color:var(--cream);text-align:left;
+  padding:13px 15px;cursor:pointer;font-family:inherit;
+}
+.fs-head:hover{background:var(--ink-3);}
+.fs-title{font-size:14.5px;font-weight:600;}
+.fs-status{font-size:11.5px;color:var(--gold-soft);opacity:0.75;margin-left:auto;white-space:nowrap;}
+.fs-chevron{font-size:11px;color:var(--gold-soft);opacity:0.7;transition:transform .18s ease;flex-shrink:0;}
+.form-section.open .fs-chevron{transform:rotate(180deg);}
+.fs-body{display:none;padding:2px 15px 15px;}
+.form-section.open .fs-body{display:block;}
+/* Die Abschnitte bringen ihre eigene Kopfzeile mit — die alten <h3> innen
+   entfallen, ebenso deren Abstand nach oben. */
+.fs-body > h3:first-child{margin-top:0;}
+@media (prefers-reduced-motion: reduce){ .fs-chevron{transition:none;} }
 .sub-title{font-size:12px;text-transform:uppercase;letter-spacing:0.05em;color:var(--gold-soft);margin:12px 0 8px;opacity:0.85;}
 .sub-title:first-child{margin-top:0;}
 .item-row2{background:var(--ink-3);border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:6px;}
@@ -1156,6 +1180,24 @@ function ensureEventAblauf(evt){
   if(!evt.ablauf || !Array.isArray(evt.ablauf.items)) evt.ablauf = { items: [] };
   return evt.ablauf;
 }
+// Rahmen für die einklappbaren Abschnitte des Termin-Formulars.
+// key      — merkt den Auf-/Zu-Zustand in state.openFormSections
+// status   — kurze Standmeldung für die Kopfzeile; sie ist der Grund, warum
+//            Zuklappen nichts verbirgt ("5 Punkte · 1 erledigt")
+// defaultOpen — nur beim allerersten Anzeigen wirksam
+function renderFormSection(key, titel, status, inhalt, defaultOpen){
+  if(state.openFormSections[key]===undefined) state.openFormSections[key] = !!defaultOpen;
+  const offen = state.openFormSections[key];
+  return `
+  <div class="form-section ${offen?'open':''}">
+    <button type="button" class="fs-head" id="fs-${key}" data-form-section="${key}" aria-expanded="${offen?'true':'false'}">
+      <span class="fs-title">${escapeHtml(titel)}</span>
+      ${status?`<span class="fs-status">${escapeHtml(status)}</span>`:'<span class="fs-status"></span>'}
+      <span class="fs-chevron" aria-hidden="true">▾</span>
+    </button>
+    <div class="fs-body">${inhalt}</div>
+  </div>`;
+}
 function renderInventorySection(evt){
   const inv = ensureEventInventory(evt);
   const items = inv.items;
@@ -1208,8 +1250,8 @@ function renderInventorySection(evt){
       <button type="button" class="btn ghost sm" id="invApplyListBtn">Übernehmen</button>
     </div>
     <div class="hint">Gespeicherte Listen verwaltest du im Reiter „Inventar".</div>` : '';
-  return `
-  <h3 style="margin-top:20px;">Inventarliste <span class="tag" style="opacity:.6;">${doneCount}/${items.length} abgehakt</span></h3>
+  const status = items.length ? `${doneCount}/${items.length} abgehakt` : 'leer';
+  return renderFormSection('inventar', 'Inventarliste', status, `
   <div id="inventoryWrap">
     ${blocks}
     ${copyFromHtml}
@@ -1218,7 +1260,7 @@ function renderInventorySection(evt){
       <button type="button" class="btn ghost sm" id="invResetChecksBtn">🔄 Häkchen zurücksetzen</button>
       <button type="button" class="btn ghost sm" id="invPrintBtn">🖨 Als PDF / Senden</button>
     </div>
-  </div>`;
+  </div>`, false);
 }
 // Sortiert die Ablaufpunkte in die Reihenfolge, in der sie am Einsatztag
 // abgearbeitet werden: erst alles mit Uhrzeit chronologisch, danach die
@@ -1277,8 +1319,13 @@ function renderAblaufSection(evt){
       <button type="button" class="btn ghost sm" id="ablaufCopyFromBtn">Übernehmen</button>
     </div>
     <div class="hint">Übernimmt den kompletten Ablauf dieses Termins samt Uhrzeiten — die Häkchen starten frisch.</div>` : '';
-  return `
-  <h3 style="margin-top:20px;">Ablaufliste ${items.length?`<span class="tag" style="opacity:.6;">${doneCount}/${items.length} erledigt</span>`:''}</h3>
+  // Die Kopfzeile nennt Umfang und Startzeit — beides entscheidet, ob man den
+  // Abschnitt überhaupt aufklappen muss.
+  const ersteZeit = mitZeit.length ? mitZeit[0].time : '';
+  const status = items.length
+    ? `${items.length} ${items.length===1?'Punkt':'Punkte'}${ersteZeit?` · ab ${ersteZeit}`:''} · ${doneCount} erledigt`
+    : 'leer';
+  return renderFormSection('ablauf', 'Ablaufliste', status, `
   <div id="ablaufWrap">
     ${items.length ? `
       ${mitZeit.map(it=>renderAblaufRow(it,{showMove:false})).join('')}
@@ -1297,7 +1344,7 @@ function renderAblaufSection(evt){
       <button type="button" class="btn ghost sm" id="ablaufPrintBtn">🖨 Als PDF / Senden</button>
       ${items.length?'<button type="button" class="btn ghost sm" id="ablaufSaveAsListBtn">💾 Als Vorlage speichern</button>':''}
     </div>
-  </div>`;
+  </div>`, false);
 }
 function renderInventoryCoreAdmin(){
   const items = (state.inventoryCore && state.inventoryCore.items) || [];
@@ -1522,6 +1569,10 @@ let state = {
   selectedDate: null,
   editingEvent: null,   // event object being edited in modal
   openCats: {},
+  // Auf-/Zu-Zustand der Formular-Abschnitte (Inventar, Ablauf, Rezeptur,
+  // Einkauf). Gilt terminübergreifend für die Sitzung: wer den Ablauf einmal
+  // aufklappt, will ihn beim nächsten Termin meist auch sehen.
+  openFormSections: {},
   loaded:false,
   authUser: null,
   authError: null,
@@ -2578,8 +2629,8 @@ function renderWochenmarktFields(e){
     <h3 style="margin-top:20px;">Ausgewählte ${gerichteLabel}</h3>
     <div id="selectedDishesWrap">${renderWochenmarktDishTable(e)}</div>
 
-    <h3 style="margin-top:20px;">Einkaufsmenge (aus Rezepturen berechnet)</h3>
-    <div id="wochenmarktEinkaufWrap">${renderIngredientShoppingList(e)}</div>
+    ${renderFormSection('einkauf', 'Einkaufsmenge (aus Rezepturen berechnet)', '',
+      `<div id="wochenmarktEinkaufWrap">${renderIngredientShoppingList(e)}</div>`, false)}
   `;
 }
 
@@ -2652,11 +2703,16 @@ function renderEventLikeFields(e){
     <h3 style="margin-top:20px;">Ausgewählte Gerichte</h3>
     <div id="selectedDishesWrap">${renderSelectedDishesTable(e)}</div>
 
-    <h3 style="margin-top:20px;">Rezeptur-Zuordnung (für Einkaufsliste)</h3>
-    <div id="recipeAssignWrap">${renderRecipeAssignment(e)}</div>
+    ${/* Rezeptur und Einkaufsmenge sind aus den Gerichten abgeleitet: beim
+         Zusammenstellen des Termins braucht man sie nicht, beim Einkaufen
+         schon. Deshalb zugeklappt — und bewusst ohne Standmeldung in der
+         Kopfzeile, weil der Gerichte-Bereich sich gezielt aktualisiert
+         (refreshDishSection) und eine Zahl dort veralten würde. */''}
+    ${renderFormSection('rezeptur', 'Rezeptur-Zuordnung (für Einkaufsliste)', '',
+      `<div id="recipeAssignWrap">${renderRecipeAssignment(e)}</div>`, false)}
 
-    <h3 style="margin-top:20px;">Einkaufsmenge (aus Rezepturen berechnet)</h3>
-    <div id="ingredientListWrap">${renderIngredientShoppingList(e)}</div>
+    ${renderFormSection('einkauf', 'Einkaufsmenge (aus Rezepturen berechnet)', '',
+      `<div id="ingredientListWrap">${renderIngredientShoppingList(e)}</div>`, false)}
 
     <div class="field" style="margin-top:18px;">
       <label>Nebenkostenpauschale (für Angebot/Rechnung)</label>
@@ -3175,6 +3231,16 @@ function attachGlobalHandlers(){
       state.editingEvent = null;
       render();
     };
+
+    // Ein-/Ausklappen der Formular-Abschnitte. Neuzeichnen ist hier
+    // gefahrlos: Textfelder wandern bei jedem Tastenanschlag ins
+    // editingEvent (siehe liveFieldMap), und render() stellt Scroll-Position
+    // und Eingabefokus wieder her.
+    document.querySelectorAll('[data-form-section]').forEach(btn=>btn.onclick=()=>{
+      const k = btn.dataset.formSection;
+      state.openFormSections[k] = !state.openFormSections[k];
+      render();
+    });
 
     // Inventarliste (nur wenn im Termin sichtbar)
     const invWrap = document.getElementById('inventoryWrap');
