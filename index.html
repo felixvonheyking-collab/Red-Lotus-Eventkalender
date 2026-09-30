@@ -405,6 +405,13 @@ table.dish-table select,table.dish-table input{padding:5px 7px;font-size:12.5px;
 .rcpt-line .fill.tall{min-height:52px;}
 .rcpt-sign{display:flex;gap:28px;margin-top:22px;}
 .rcpt-sign > div{flex:1;}
+.rcpt-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:6px 0 14px;}
+#printArea .rcpt-tools select{width:auto;max-width:360px;color:#1c1b1a;padding:6px 8px;border:1px solid #c9a35e;border-radius:8px;background:#fff;font-size:12.5px;}
+#printArea .rcpt-tools .btn{color:#6b1526;border-color:#c9a35e;background:#fff;}
+.rc-del{border:none;background:none;color:#8f1d33;cursor:pointer;font-size:13px;}
+.rc-rate{border:1px solid #e9ddc6;border-radius:6px;background:#fff;color:#1c1b1a;font-size:12px;padding:2px 4px;}
+.rc-ph{min-height:60px;}
+.rc-ph:empty:before{content:attr(data-ph);color:#aaa;font-style:italic;}
 .inv-topline{color:#8f1d33;font-size:10.5px;margin-bottom:18px;}
 .inv-header-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:22px;}
 .inv-recipient{font-size:13px;line-height:1.6;padding-top:10px;}
@@ -429,6 +436,9 @@ table.inv-dishes td{border:1px solid #e9ddc6;font-size:12px;padding:6px;text-ali
   #printArea, #printArea *{visibility:visible;}
   #printArea{position:absolute;inset:0;padding:0;display:block !important;}
   .print-toolbar{display:none !important;}
+  .rc-noprint{display:none !important;}
+  .rc-ph:empty:before{content:none;}
+  .rc-rate{border:none;-webkit-appearance:none;appearance:none;background:none;color:#1c1b1a;font-size:12.5px;}
   .app,.overlay{display:none !important;}
 }
 [contenteditable="true"]{outline:none;border-bottom:1px dashed #c9a35e;}
@@ -2448,7 +2458,7 @@ function renderEventRow(e){
       ${showDishButtons ? `<button type="button" class="btn ghost sm" data-action="menu-pdf" data-id="${e.id}">${(cat==='wochenmarkt'||cat==='festivalTL')?'Gerichte PDF':'Speisekarte PDF'}</button>` : ''}
       ${showDishButtons ? `<button type="button" class="btn ghost sm" data-action="einkauf-pdf" data-id="${e.id}">🛒 Einkaufsliste PDF</button>` : ''}
       ${showInvoiceButton ? `<button type="button" class="btn gold sm" data-action="angebot" data-id="${e.id}">Angebot</button>` : ''}
-      ${showReceiptButton ? `<button type="button" class="btn ghost sm" data-action="quittung" data-id="${e.id}" title="Quittung / Bewirtungsbeleg für einen Gast">🧾 Quittung</button>` : ''}
+      ${showReceiptButton ? `<button type="button" class="btn ghost sm" data-action="quittung" data-id="${e.id}" title="Quittung für einen Gast">🧾 Quittung</button>` : ''}
       ${(isRequestFlow && reqStatus==='angenommen' && !invoiced) ? `<button type="button" class="btn gold sm" data-action="abschliessen" data-id="${e.id}">✅ Auftrag abschließen</button>` : ''}
       ${(isRequestFlow && invoiced) ? `<button type="button" class="btn ghost sm" data-action="rechnung-pdf" data-id="${e.id}">🧾 Rechnung öffnen</button>` : ''}
       <button type="button" class="btn ghost sm" data-action="gcal" data-id="${e.id}" title="In Google Kalender speichern">📅${e.gcalEventId?' ✓':''}</button>
@@ -4371,9 +4381,8 @@ function openOfferPrint(evt, opts){
 // Name und Anschrift des Empfängers gehören ausdrücklich NICHT dazu — genau
 // deshalb taugt sie für den Marktstand, wo man den Gast nicht kennt.
 //
-// Der Bewirtungsteil bleibt leer. Anlass, Teilnehmer und Unterschrift muss
-// nach § 4 Abs. 5 Satz 1 Nr. 2 EStG der Bewirtende selbst eintragen, also der
-// Gast — nicht wir. Wir drucken nur die Zeilen dafür.
+// Bewirtungsteil (Anlass/Unterschrift) entfernt (Felix, 30.09.2026) — nur
+// noch Name/Anschrift (optional), Datum und Posten mit MwSt.
 //
 // Ab 250 € brutto ist es keine Kleinbetragsrechnung mehr; dann verlangt § 14
 // UStG die Empfängerdaten. Darauf weist die Vorlage live hin, statt still
@@ -4393,28 +4402,27 @@ async function openReceiptPrint(evt){
   }
 
   const logo = `<img src="${state.settings.logo || DEFAULT_LOGO}">`;
-  // Positionen aus den Gerichten des Termins vorbefüllen (Felix' Wahl).
-  // Hat der Termin keine Gerichte — bei "Sonstiges" der Normalfall —, kommt
-  // eine leere Zeile zum Selbstausfüllen.
+  // Felix, 30.09.2026: Nicht mehr das ganze Tagesmenü vorbefüllen. Die
+  // Quittung startet mit einer leeren Zeile; Gerichte des Termins lassen sich
+  // gezielt über die Auswahl hinzufügen, jede Zeile ist frei änderbar und
+  // löschbar, MwSt-Satz pro Zeile (7 % Speisen / 19 % Getränke).
   const dishes = (evt.dishes||[]).filter(d=>d && d.name);
-  const zeilen = dishes.length ? dishes.map((d,i)=>{
-    const menge = (parseFloat(d.qty)||1) * (parseFloat(d.factor)||1);
-    const einzel = parseFloat(d.unitPrice)||0;
+  const dishOpts = dishes.map((d,i)=>{
     const bez = d.variant ? `${d.name} (${d.variant})` : d.name;
+    return `<option value="${i}">${escapeHtml(bez)} — ${fmtEUR(parseFloat(d.unitPrice)||0)}</option>`;
+  }).join('');
+
+  function rowHtml(bez, menge, einzel, satz){
     return `<tr>
-            <td>${i+1}</td>
-            <td contenteditable="true">${escapeHtml(bez)}</td>
-            <td style="text-align:center;" class="rc-qty" contenteditable="true">${menge}</td>
+            <td class="rc-pos"></td>
+            <td class="rc-bez" contenteditable="true">${bez ? escapeHtml(bez) : ''}</td>
+            <td style="text-align:center;" class="rc-qty" contenteditable="true">${String(menge).replace('.',',')}</td>
             <td style="text-align:right;" class="rc-unit" contenteditable="true">${fmtEUR(einzel)}</td>
+            <td style="text-align:center;"><select class="rc-rate"><option value="7"${satz==19?'':' selected'}>7 %</option><option value="19"${satz==19?' selected':''}>19 %</option></select></td>
             <td style="text-align:right;" class="rc-sum">${fmtEUR(einzel*menge)}</td>
+            <td class="rc-noprint" style="text-align:center;"><button type="button" class="rc-del" title="Zeile entfernen">✕</button></td>
           </tr>`;
-  }).join('') : `<tr>
-            <td>1</td>
-            <td contenteditable="true">&nbsp;</td>
-            <td style="text-align:center;" class="rc-qty" contenteditable="true">1</td>
-            <td style="text-align:right;" class="rc-unit" contenteditable="true">${fmtEUR(0)}</td>
-            <td style="text-align:right;" class="rc-sum">${fmtEUR(0)}</td>
-          </tr>`;
+  }
 
   const html = `
     <div class="print-toolbar">
@@ -4423,57 +4431,36 @@ async function openReceiptPrint(evt){
     </div>
     <div class="print-body invoice-body">
       <div class="inv-header-grid">
-        <div class="inv-recipient"></div>
+        <div class="inv-recipient"><div id="rcRecipient" class="rc-ph" contenteditable="true" data-ph="Name und Anschrift des Kunden (optional)"></div></div>
         <div class="inv-sender">
           <div class="rl-print-logo">${logo}</div>
           <div contenteditable="true"><b>${COMPANY.name}</b><br>${COMPANY.addressLine}<br>${COMPANY.cityLine}<br>Tel.: ${COMPANY.tel}<br>E-Mail: ${COMPANY.email}</div>
         </div>
       </div>
 
-      <h1 class="inv-title" contenteditable="true">Quittung / Bewirtungsbeleg</h1>
+      <h1 class="inv-title" contenteditable="true">Quittung</h1>
       <div class="inv-meta">
         <span><b>Beleg-Nr.:</b> <span contenteditable="true">${escapeHtml(rcptNo || '—')}</span></span>
         <span><b>Datum:</b> <span contenteditable="true">${new Date().toLocaleDateString('de-DE')}</span></span>
-        <span><b>Ort:</b> <span contenteditable="true">${escapeHtml(evt.marketOrt || evt.ort || 'Biberach')}</span></span>
       </div>
 
       <table class="inv-table">
-        <thead><tr><th>#</th><th>Menge und Art der Leistung</th><th>Anzahl</th><th>Einzelpreis</th><th>Gesamt</th></tr></thead>
-        <tbody id="rcptRows">${zeilen}</tbody>
+        <thead><tr><th>#</th><th>Menge und Art der Leistung</th><th>Anzahl</th><th>Einzelpreis</th><th>MwSt.</th><th>Gesamt</th><th class="rc-noprint"></th></tr></thead>
+        <tbody id="rcptRows">${rowHtml('', 1, 0, 7)}</tbody>
       </table>
+
+      <div class="rc-noprint rcpt-tools">
+        ${dishes.length ? `<select id="rcDishPick"><option value="">+ Gericht aus dem Tagesmenü …</option>${dishOpts}</select>` : ''}
+        <button type="button" class="btn ghost sm" id="rcAddRow">+ Freie Zeile</button>
+      </div>
 
       <table class="inv-summary">
-        <tbody>
-          <tr><td>Nettobetrag</td><td style="text-align:right;" id="rcNetto">—</td></tr>
-          <tr><td>zzgl. MwSt. <span id="rcRate" contenteditable="true">7</span> %</td><td style="text-align:right;" id="rcMwst">—</td></tr>
-          <tr class="inv-total-row"><td><b>Bruttobetrag</b></td><td style="text-align:right;" id="rcBrutto"><b>—</b></td></tr>
-        </tbody>
+        <tbody id="rcSummary"></tbody>
       </table>
 
-      <div id="rcLimitWarn" style="display:none;" class="rcpt-warn"></div>
+      <div id="rcLimitWarn" style="display:none;" class="rcpt-warn rc-noprint"></div>
 
       <div class="rcpt-paid" contenteditable="true">Betrag dankend erhalten. Zahlung erfolgte bar / per PayPal.</div>
-
-      <div class="rcpt-note">
-        Kleinbetragsrechnung nach § 33 UStDV. Speisen werden mit dem ermäßigten
-        Steuersatz von 7 % abgerechnet; für Getränke gilt der Regelsatz von 19 % —
-        den Satz oben gegebenenfalls anpassen.
-      </div>
-
-      <div class="rcpt-bew">
-        <h2>Angaben zur Bewirtung</h2>
-        <div class="rcpt-hint">
-          Bitte vom bewirtenden Gast selbst ausfüllen. Diese Angaben sind nach
-          § 4 Abs. 5 Satz 1 Nr. 2 EStG Voraussetzung für den Betriebsausgabenabzug
-          und müssen vom Bewirtenden stammen, nicht vom Gastbetrieb.
-        </div>
-        <div class="rcpt-line"><span class="lbl">Anlass der Bewirtung</span><span class="fill"></span></div>
-        <div class="rcpt-line"><span class="lbl">Bewirtete Personen (Namen, vollständig)</span><span class="fill tall"></span></div>
-        <div class="rcpt-sign">
-          <div class="rcpt-line"><span class="lbl">Ort, Datum</span><span class="fill"></span></div>
-          <div class="rcpt-line"><span class="lbl">Unterschrift des Bewirtenden</span><span class="fill"></span></div>
-        </div>
-      </div>
 
       <div class="inv-footer" contenteditable="true">
         <div><b>Rechtsform:</b> ${COMPANY.rechtsform}<br><b>Inhaber:</b> ${COMPANY.geschaeftsfuehrer}</div>
@@ -4484,37 +4471,77 @@ async function openReceiptPrint(evt){
   const pa = document.getElementById('printArea');
   pa.innerHTML = html;
   pa.classList.add('show');
+  const tbody = pa.querySelector('#rcptRows');
 
   function parseGermanNumber(str){
     return parseFloat(String(str).replace(/[^\d,.-]/g,'').replace(/\./g,'').replace(',','.'))||0;
   }
   function recalcReceipt(){
+    const perRate = {};
     let brutto = 0;
-    pa.querySelectorAll('#rcptRows tr').forEach(tr=>{
+    tbody.querySelectorAll('tr').forEach((tr,i)=>{
+      tr.querySelector('.rc-pos').textContent = i+1;
       const menge = parseGermanNumber(tr.querySelector('.rc-qty').textContent) || 0;
       const einzel = parseGermanNumber(tr.querySelector('.rc-unit').textContent) || 0;
+      const satz = parseFloat(tr.querySelector('.rc-rate').value) || 0;
       const zeile = menge * einzel;
       tr.querySelector('.rc-sum').textContent = fmtEUR(zeile);
+      perRate[satz] = (perRate[satz]||0) + zeile;
       brutto += zeile;
     });
-    const satz = parseGermanNumber(pa.querySelector('#rcRate').textContent) || 0;
-    const netto = brutto / (1 + satz/100);
-    pa.querySelector('#rcNetto').textContent = fmtEUR(netto);
-    pa.querySelector('#rcMwst').textContent = fmtEUR(brutto - netto);
-    pa.querySelector('#rcBrutto').innerHTML = '<b>'+fmtEUR(brutto)+'</b>';
+    // Immer von den festen Bruttopreisen nach unten rechnen, je Steuersatz.
+    let rows = '';
+    Object.keys(perRate).map(Number).sort((a,b)=>a-b).forEach(satz=>{
+      const b = perRate[satz];
+      if(!b) return;
+      const netto = b / (1 + satz/100);
+      rows += `<tr><td>Nettobetrag ${satz} %</td><td style="text-align:right;">${fmtEUR(netto)}</td></tr>
+               <tr><td>zzgl. MwSt. ${satz} %</td><td style="text-align:right;">${fmtEUR(b-netto)}</td></tr>`;
+    });
+    rows += `<tr class="inv-total-row"><td><b>Bruttobetrag</b></td><td style="text-align:right;"><b>${fmtEUR(brutto)}</b></td></tr>`;
+    pa.querySelector('#rcSummary').innerHTML = rows;
 
-    // Ab 250 € brutto greift § 33 UStDV nicht mehr.
+    // Ab 250 € brutto greift § 33 UStDV nicht mehr — dann braucht es Name
+    // und Anschrift des Kunden. Hinweis nur am Bildschirm, nicht im Druck.
     const warn = pa.querySelector('#rcLimitWarn');
-    if(brutto > 250){
+    const hatEmpfaenger = pa.querySelector('#rcRecipient').textContent.trim().length > 0;
+    if(brutto > 250 && !hatEmpfaenger){
       warn.style.display = '';
-      warn.textContent = 'Achtung: über 250 € brutto. Das ist keine Kleinbetragsrechnung mehr — '
-        + 'für den Vorsteuerabzug braucht der Gast dann eine vollständige Rechnung nach § 14 UStG '
-        + 'mit seinem Namen und seiner Anschrift. Bitte stattdessen eine reguläre Rechnung ausstellen.';
+      warn.textContent = 'Über 250 € brutto: Bitte oben Name und Anschrift des Kunden eintragen '
+        + '(ab dieser Grenze keine Kleinbetragsrechnung mehr, § 14 UStG).';
     } else {
       warn.style.display = 'none';
     }
   }
-  pa.querySelectorAll('.rc-qty, .rc-unit, #rcRate').forEach(el=>el.addEventListener('input', recalcReceipt));
+  function addRow(bez, menge, einzel, satz){
+    tbody.insertAdjacentHTML('beforeend', rowHtml(bez, menge, einzel, satz));
+    recalcReceipt();
+  }
+
+  // Event-Delegation: gilt auch für nachträglich hinzugefügte Zeilen.
+  tbody.addEventListener('input', recalcReceipt);
+  tbody.addEventListener('change', recalcReceipt);
+  tbody.addEventListener('click', e=>{
+    const del = e.target.closest('.rc-del');
+    if(!del) return;
+    del.closest('tr').remove();
+    if(!tbody.querySelector('tr')) addRow('', 1, 0, 7);
+    recalcReceipt();
+  });
+  pa.querySelector('#rcRecipient').addEventListener('input', recalcReceipt);
+  pa.querySelector('#rcAddRow').onclick = ()=>addRow('', 1, 0, 7);
+  const pick = pa.querySelector('#rcDishPick');
+  if(pick) pick.onchange = ()=>{
+    const d = dishes[+pick.value];
+    pick.value = '';
+    if(!d) return;
+    const bez = d.variant ? `${d.name} (${d.variant})` : d.name;
+    // Leere Startzeile ersetzen statt eine zweite anzuhängen.
+    const rows = tbody.querySelectorAll('tr');
+    if(rows.length===1 && !rows[0].querySelector('.rc-bez').textContent.trim()
+       && !parseGermanNumber(rows[0].querySelector('.rc-unit').textContent)) rows[0].remove();
+    addRow(bez, 1, parseFloat(d.unitPrice)||0, 7);
+  };
   recalcReceipt();
 }
 
