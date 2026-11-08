@@ -1755,6 +1755,45 @@ function handleDeepLinkOnce(){
   deepLinkHandled = true;
   const params = new URLSearchParams(window.location.search);
   const eventId = params.get('event');
+  const ausKalk = params.get('kalk')==='1';
+  if(ausKalk){
+    // Aus kalkulation.html: Werte als UNGESPEICHERTE Änderung in den Editor
+    // legen — gespeichert wird erst mit "Speichern". URL danach säubern,
+    // damit ein Neuladen die Werte nicht erneut anwendet.
+    try{ history.replaceState(null, '', window.location.pathname); }catch(e){}
+    const evt = eventId ? state.events.find(e=>e.id===eventId) : null;
+    if(eventId && !evt){ showToast('Termin aus der Kalkulation nicht gefunden.', true); return; }
+    const ee = evt ? JSON.parse(JSON.stringify(evt)) : {
+      id:uid(), date:'', category:'event', anlass:'', contactName:'', email:'', phone:'',
+      company:'', people:'', art:ART_OPTIONS[0], address:'', notes:'', dishes:[], nebenkostenOverride:null,
+      sonstOrt:'', sonstWie:'', requestStatus:'anfrage', _isNew:true };
+    if(!ee.category) ee.category = 'event';
+    const g = (k)=>params.get(k);
+    if(g('datum')) ee.date = g('datum');
+    if(g('gaeste')) ee.people = g('gaeste');
+    ee.preis = Object.assign({km:'', rabatt:'', porzellan:false, anzahlung:true}, ee.preis||{}, {
+      modus:'staffel',
+      km: g('km')||'',
+      rabatt: g('rabatt')||'',
+      grundpreis: g('grundpreis')||'',
+      porzellan: g('porzellan')==='1',
+      anzahlung: g('anzahlung')!=='0'
+    });
+    if(g('neben')!==null){
+      const nb = parseFloat(g('neben'));
+      const auto = computeNebenkosten(ee.art, ee.people, null);
+      ee.nebenkostenOverride = (isNaN(nb) || nb===auto) ? null : nb;
+    }
+    state.tab = 'kalender';
+    state.selectedDate = ee.date || state.selectedDate;
+    state.editingEvent = ee;
+    // Merkt sich (nur im Browser, nicht in Firestore), womit kalkuliert wurde,
+    // damit der Editor erinnert, bis die Gerichte dazu passen.
+    state.kalkHinweis = { id: ee.id, gerichte: parseInt(g('gerichte'))||0, premium: parseInt(g('premium'))||0, total: parseFloat(g('total'))||0 };
+    const hg = g('gerichte'), pm = g('premium');
+    setTimeout(()=>showToast(`Werte aus der Kalkulation übernommen${hg?` – bitte ${hg} Hauptgericht${hg==='1'?'':'e'}${pm&&pm!=='0'?` (davon ${pm} Rind/Fisch/Seafood)`:''} auswählen`:''} und speichern.`, false), 300);
+    return;
+  }
   if(!eventId) return;
   const evt = state.events.find(e=>e.id===eventId);
   if(evt){
@@ -2757,7 +2796,16 @@ function renderPreisPreview(e){
   if(!isStaffel(e)) return 'Preis wird wie bisher aus den Kartenpreisen der Gerichte berechnet.';
   const o = computeOffer(e);
   const anz = o.anzahlung ? ` · Anzahlung ${fmtEUR(o.anzahlung)}` : '';
-  return `<b>Angebot: ${fmtEUR(o.totalBrutto)}</b> brutto (Speisen ${fmtEUR(o.foodBrutto)}, Pauschale ${fmtEUR(o.nebenkosten)})${anz}`;
+  let hinweis = '';
+  const kh = state.kalkHinweis;
+  if(kh && kh.id===e.id){
+    const mains = (e.dishes||[]).filter(isMainDish);
+    const prem = mains.filter(d=>PREMIUM_VARIANTS.includes(d.variant)).length;
+    if(mains.length!==kh.gerichte || prem!==kh.premium){
+      hinweis = `<div style="color:var(--gold-soft);margin-top:4px;">⚠️ In der Kalkulation gerechnet mit ${kh.gerichte} Hauptgericht${kh.gerichte===1?'':'en'}${kh.premium?` (davon ${kh.premium} Rind/Fisch/Seafood)`:''}${kh.total?` = ${fmtEUR(kh.total)}`:''} – ausgewählt sind ${mains.length}${prem?` (davon ${prem} Premium)`:''}.</div>`;
+    }
+  }
+  return `<b>Angebot: ${fmtEUR(o.totalBrutto)}</b> brutto (Speisen ${fmtEUR(o.foodBrutto)}, Pauschale ${fmtEUR(o.nebenkosten)})${anz}${hinweis}`;
 }
 function renderPreisFields(e){
   const pr = e.preis || {};
@@ -2774,6 +2822,7 @@ function renderPreisFields(e){
         <div><label>Entfernung einfach (km)</label><input type="number" min="0" step="1" id="f-preis-km" value="${pr.km??''}" placeholder="z. B. 35"></div>
         <div><label>Rabatt auf Speisen (%)</label><input type="number" min="0" max="100" step="1" id="f-preis-rabatt" value="${pr.rabatt??''}" placeholder="0"></div>
       </div>
+      <div style="margin-top:10px;"><label>Sonderpreis p. P. (brutto, leer = Preisliste)</label><input type="number" min="0" step="0.5" id="f-preis-grundpreis" value="${pr.grundpreis??''}" placeholder="Preisliste: ${fmtEUR(staffelPreis(e.people))}"></div>
       <label style="display:flex;align-items:center;gap:8px;margin-top:8px;text-transform:none;letter-spacing:0;"><input type="checkbox" id="f-preis-porzellan" ${pr.porzellan?'checked':''}> Porzellan statt Einweg (+${fmtEUR(PR('porzellanAufpreis'))} p. P.)</label>
       <label style="display:flex;align-items:center;gap:8px;margin-top:4px;text-transform:none;letter-spacing:0;"><input type="checkbox" id="f-preis-anzahlung" ${pr.anzahlung===false?'':'checked'}> ${PR('anzahlungPct')} % Anzahlung verlangen (abwählen z. B. bei Stammkunden)</label>
       ` : ''}
@@ -3179,7 +3228,7 @@ function attachGlobalHandlers(){
       render();
     });
     const refreshPreisPreview = ()=>{ const el = document.getElementById('preisPreview'); if(el) el.innerHTML = renderPreisPreview(state.editingEvent); };
-    [['f-preis-km','km'],['f-preis-rabatt','rabatt']].forEach(([id,key])=>{
+    [['f-preis-km','km'],['f-preis-rabatt','rabatt'],['f-preis-grundpreis','grundpreis']].forEach(([id,key])=>{
       const el = document.getElementById(id);
       if(el) el.oninput = ()=>{ state.editingEvent.preis[key] = el.value; refreshPreisPreview(); };
     });
@@ -3239,7 +3288,10 @@ function attachGlobalHandlers(){
     };
     Object.keys(liveFieldMap).forEach(fid=>{
       const el = document.getElementById(fid);
-      if(el) el.oninput = ()=>{ state.editingEvent[liveFieldMap[fid]] = el.value; };
+      if(el) el.oninput = ()=>{
+        state.editingEvent[liveFieldMap[fid]] = el.value;
+        if(fid==='f-people'){ const pv = document.getElementById('preisPreview'); if(pv) pv.innerHTML = renderPreisPreview(state.editingEvent); }
+      };
     });
     const dateEl = document.getElementById('f-date');
     if(dateEl) dateEl.oninput = ()=>{ state.editingEvent.date = dateEl.value; };
@@ -3887,6 +3939,8 @@ function refreshDishSection(){
     const assignWrap = document.getElementById('recipeAssignWrap');
     if(assignWrap) assignWrap.innerHTML = renderRecipeAssignment(state.editingEvent);
     attachDishHandlers();
+    const pv = document.getElementById('preisPreview');
+    if(pv) pv.innerHTML = renderPreisPreview(state.editingEvent);
     if(overlayEl) overlayEl.scrollTop = overlayScroll;
   }catch(err){
     console.error('Fehler im Gerichte-Bereich:', err);
@@ -4285,7 +4339,9 @@ function computeOffer(src){
   const lines = [];
   const artLabel = ART_INVOICE_LABEL[src.art] || (src.art||'Catering');
   const inkl = PR('gerichteInklusive');
-  lines.push({ label:`${artLabel} (${inkl} Hauptgerichte inkl. Reis, 3 Std. Ausgabe)`, qty:people, unit:staffelPreis(people) });
+  const sonder = parseFloat(String(pr.grundpreis??'').replace(',','.'));
+  const hatSonder = !isNaN(sonder) && sonder>0;
+  lines.push({ label:`${artLabel} (${inkl} Hauptgerichte inkl. Reis, 3 Std. Ausgabe)`, qty:people, unit: hatSonder ? sonder : staffelPreis(people) });
   const extraMains = Math.max(0, mains.length - inkl);
   if(extraMains>0) lines.push({ label:`Aufpreis ${extraMains} weitere${extraMains>1?'':'s'} Hauptgericht${extraMains>1?'e':''}`, qty:people, unit: round2(extraMains*PR('aufpreisGericht')) });
   const premium = mains.filter(d=>PREMIUM_VARIANTS.includes(d.variant)).length;

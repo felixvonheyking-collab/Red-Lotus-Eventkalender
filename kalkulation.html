@@ -568,6 +568,8 @@ function renderApp(){
         <div class="field"><label>Minijob-Stunden</label><input type="number" inputmode="decimal" min="0" step="0.5" id="in-minijob" value="${i.minijob??''}"></div>
       </div>
       <div class="hint" id="autoHint" style="margin-top:-6px;"></div>
+      <button type="button" class="btn gold" id="toOfferBtn" style="width:100%;margin-top:14px;padding:12px;">📋 ${i.eventId ? 'In diesen Termin übernehmen' : 'Als neues Angebot im Kalender anlegen'}</button>
+      <div class="hint" style="text-align:center;">Öffnet den Termin im Kalender mit diesen Werten. Gespeichert wird erst dort mit „Speichern“ – Kontakt und Gerichte ergänzt du dort.</div>
     </div>
 
     <div class="panel" id="results"></div>
@@ -702,7 +704,7 @@ function loadEvent(id){
   state.input.extras = Math.round(extrasSum*100)/100 || '';
   state.input.nebenkosten = computeNebenkosten(e.art||'Foodtruckcatering', people, e.nebenkostenOverride);
   if(pr.modus==='staffel'){
-    state.input.grundpreis = '';
+    state.input.grundpreis = pr.grundpreis ?? '';
     state.input.km = pr.km!==undefined && pr.km!=='' ? num(pr.km) : state.input.km;
     state.input.rabatt = pr.rabatt || '';
     state.input.porzellan = !!pr.porzellan;
@@ -734,6 +736,26 @@ function attachAppHandlers(){
       updateResults();
     };
   });
+  document.getElementById('toOfferBtn').onclick = ()=>{
+    const i = state.input, p = currentParams();
+    const e = i.eventId ? state.events.find(x=>x.id===i.eventId) : null;
+    if(e && e.acceptedOffer && !confirm('Für diesen Termin gibt es schon ein angenommenes (eingefrorenes) Angebot. Die Rechnung nutzt weiterhin die eingefrorenen Werte. Trotzdem übernehmen?')) return;
+    if(e && !(e.preis && e.preis.modus==='staffel') && !confirm('Dieser Termin wird bisher nach Kartenpreisen berechnet. Beim Speichern wird er auf die Preisliste umgestellt – der Preis kann sich ändern. Weiter?')) return;
+    const q = new URLSearchParams({ kalk:'1' });
+    if(e) q.set('event', e.id);
+    q.set('datum', i.datum || '');
+    q.set('gaeste', String(p.gaeste));
+    q.set('km', String(p.km));
+    if(p.rabatt) q.set('rabatt', String(p.rabatt));
+    if(p.grundpreis!=null && !p.legacy) q.set('grundpreis', String(p.grundpreis));
+    q.set('porzellan', p.porzellan ? '1' : '0');
+    q.set('anzahlung', p.anzahlung ? '1' : '0');
+    q.set('neben', String(p.nebenkosten));
+    q.set('gerichte', String(p.gerichte));
+    q.set('premium', String(p.premium));
+    q.set('total', String(Math.round(calc(p).bruttoGesamt*100)/100));
+    window.location.href = 'index.html?' + q.toString();
+  };
   document.getElementById('in-porzellan').onchange = (ev)=>{ state.input.porzellan = ev.target.checked; updateResults(); };
   document.getElementById('in-anzahlung').onchange = (ev)=>{ state.input.anzahlung = ev.target.checked; updateResults(); };
   document.querySelectorAll('[data-setting]').forEach(el=>{
