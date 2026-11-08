@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<!-- Zoom sperren: feste App-Ansicht statt rein-/rauszoomen. Dreifach, weil
+     iOS die Viewport-Angabe allein im Safari-Tab ignoriert:
+     1. Viewport-Meta (greift v. a. in der installierten Home-Bildschirm-App)
+     2. touch-action: Scrollen erlaubt, Pinch-Zoom nicht (Android/Chrome)
+     3. gesturestart abfangen (iOS-Safari-Pinch) -->
+<style>
+/* Feste App-Ansicht auf dem Handy:
+   - touch-action: Scrollen ja, Pinch-Zoom nein
+   - overflow-x: kein seitliches Verrutschen, falls doch mal etwas übersteht
+   - safe-area: Inhalt beginnt unterhalb der iOS-Statusleiste (Uhr/Akku),
+     statt von ihr überlagert zu werden (Home-Bildschirm-App, black-translucent) */
+html,body{touch-action:pan-x pan-y;overflow-x:hidden;}
+body{padding-top:env(safe-area-inset-top,0px);}
+</style>
+<script>
+document.addEventListener('gesturestart', function(e){ e.preventDefault(); }, {passive:false});
+document.addEventListener('gesturechange', function(e){ e.preventDefault(); }, {passive:false});
+</script>
+<title>Red Lotus · Kalkulation</title>
+<meta name="theme-color" content="#1c1b1a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kalkulation">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#1c1b1a; --ink-2:#2a2726; --ink-3:#3a3634;
+  --red:#8f1d33; --red-deep:#6b1526; --red-bright:#b02942;
+  --gold:#c9a35e; --gold-soft:#e4cf9c; --cream:#f6efe2; --cream-dim:#e9ddc6;
+  --line:rgba(201,163,94,0.28); --ok:#5c8362; --warn:#c9793e;
+  --shadow:0 12px 32px rgba(0,0,0,0.35);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(143,29,51,0.25), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(201,163,94,0.12), transparent 55%),
+    var(--ink);
+  color:var(--cream);
+  font-family:'Work Sans',sans-serif;
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+.wordmark{font-family:'Marcellus',serif;letter-spacing:0.04em;}
+.app{max-width:900px;margin:0 auto;padding:20px 16px 80px;}
+header.top{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px;border-radius:16px;
+  background:linear-gradient(135deg, var(--ink-2), var(--ink-3));
+  border:1px solid var(--line);box-shadow:var(--shadow);
+  margin-bottom:18px;gap:12px;flex-wrap:wrap;
+}
+.brand{display:flex;align-items:center;gap:12px;}
+.brand-mark{
+  width:44px;height:44px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%, var(--red-bright), var(--red-deep) 70%);
+  border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;
+  font-family:'Marcellus',serif;color:var(--gold-soft);font-size:20px;flex-shrink:0;
+}
+.brand h1{font-size:19px;margin:0;font-weight:600;}
+.brand .sub{font-size:11.5px;color:var(--gold-soft);opacity:0.85;letter-spacing:0.08em;text-transform:uppercase;}
+nav.suite-nav{display:flex;gap:6px;flex-wrap:wrap;}
+nav.suite-nav a{
+  text-decoration:none;color:var(--cream);border:1px solid var(--line);
+  padding:7px 12px;border-radius:9px;font-size:12.5px;font-weight:600;white-space:nowrap;
+}
+nav.suite-nav a:hover{border-color:var(--gold);}
+nav.suite-nav a.active{background:var(--red);border-color:var(--red-bright);color:#fff;}
+button{font-family:'Work Sans',sans-serif;}
+.btn{
+  background:var(--red);color:#fff;border:none;padding:9px 14px;border-radius:9px;
+  cursor:pointer;font-size:13px;font-weight:600;letter-spacing:0.01em;transition:background .15s;
+}
+.btn:hover{background:var(--red-bright);}
+.btn.gold{background:var(--gold);color:var(--ink);}
+.btn.gold:hover{background:var(--gold-soft);}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--cream);}
+.btn.ghost:hover{border-color:var(--gold);}
+.btn.danger{background:transparent;border:1px solid var(--red);color:#e79aa7;}
+.btn.danger:hover{background:var(--red);color:#fff;}
+.btn.sm{padding:6px 10px;font-size:12px;border-radius:7px;}
+.btn:disabled{opacity:0.4;cursor:not-allowed;}
+.panel{
+  background:var(--ink-2);border:1px solid var(--line);border-radius:16px;
+  padding:20px;margin-top:18px;box-shadow:var(--shadow);
+}
+.panel h3{font-family:'Marcellus',serif;font-size:19px;margin:0 0 14px;font-weight:400;color:var(--gold-soft);}
+.hint{font-size:11.5px;color:var(--cream);opacity:0.55;margin-top:4px;}
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--gold-soft);margin-bottom:5px;opacity:0.9;}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.field-row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+@media (max-width:640px){.field-row,.field-row3{grid-template-columns:1fr;}}
+select,input[type=text],input[type=email],input[type=password],input[type=number],input[type=date],input[type=month]{
+  width:100%;background:var(--ink);border:1px solid var(--line);color:var(--cream);
+  padding:8px 10px;border-radius:9px;font-size:13.5px;font-family:'Work Sans',sans-serif;
+}
+input:focus,select:focus{outline:none;border-color:var(--gold);}
+.lohn-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.lohn-row label{width:110px;font-size:13px;color:var(--cream);flex-shrink:0;}
+.lohn-row input{width:110px;}
+.sub-title{font-size:12px;text-transform:uppercase;letter-spacing:0.05em;color:var(--gold-soft);margin:12px 0 8px;opacity:0.85;}
+.sub-title:first-child{margin-top:0;}
+.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:6px;}
+.table-scroll table.dish-table{margin-top:0;min-width:480px;}
+#scenarios table.dish-table{min-width:0;}
+#scenarios th,#scenarios td{padding:6px 5px;}
+table.dish-table{width:100%;border-collapse:collapse;margin-top:6px;}
+table.dish-table th{
+  text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:0.05em;
+  color:var(--gold-soft);opacity:0.8;padding:6px 8px;border-bottom:1px solid var(--line);
+}
+table.dish-table td{padding:7px 8px;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.05);}
+.total-row td{font-weight:700;font-size:14px;padding-top:10px;color:var(--gold-soft);}
+.icon-btn{background:none;border:none;color:var(--gold-soft);opacity:0.6;cursor:pointer;font-size:13px;padding:2px 4px;}
+.icon-btn:hover{opacity:1;}
+#printArea{position:fixed;inset:0;background:#fff;z-index:9999;overflow:auto;padding:40px;display:none;}
+#printArea.show{display:block;}
+.rl-print-header{display:flex;align-items:center;gap:16px;border-bottom:3px solid #8f1d33;padding-bottom:14px;margin-bottom:20px;}
+.rl-print-logo{width:56px;height:56px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#b02942,#6b1526 70%);border:2px solid #c9a35e;flex-shrink:0;}
+.rl-print-logo img{width:100%;height:100%;border-radius:50%;object-fit:cover;}
+.rl-print-header h1{font-family:'Marcellus',serif;color:#6b1526;margin:0;font-size:22px;}
+.rl-print-header .sub{font-size:12px;color:#8f1d33;text-transform:uppercase;letter-spacing:0.08em;}
+.print-body{color:#1c1b1a;font-family:'Work Sans',sans-serif;max-width:800px;margin:0 auto;}
+.print-body table{width:100%;border-collapse:collapse;margin:14px 0;}
+.print-body th{background:#f6efe2;color:#6b1526;text-align:left;padding:8px 10px;font-size:11.5px;text-transform:uppercase;letter-spacing:0.04em;border-bottom:2px solid #c9a35e;}
+.print-body td{padding:8px 10px;border-bottom:1px solid #e9ddc6;font-size:13px;}
+.print-meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;margin-bottom:16px;font-size:13px;}
+.print-meta-grid div b{color:#6b1526;}
+.print-toolbar{display:flex;justify-content:flex-end;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+.print-footnote{font-size:11px;color:#7a746a;margin-top:24px;border-top:1px solid #e9ddc6;padding-top:10px;}
+@media print{
+  body *{visibility:hidden;}
+  #printArea, #printArea *{visibility:visible;}
+  #printArea{position:absolute;inset:0;padding:0;display:block !important;}
+  .print-toolbar{display:none !important;}
+  .app{display:none !important;}
+}
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:90vh;padding:20px;}
+.login-card{
+  background:var(--ink-2);border:1px solid var(--line);border-radius:18px;
+  padding:32px 28px;max-width:360px;width:100%;text-align:center;box-shadow:var(--shadow);
+}
+.login-card .sub{font-size:12px;color:var(--gold-soft);opacity:0.8;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:22px;}
+.login-error{background:rgba(130,33,17,0.3);border:1px solid #822111;color:#f2a78e;padding:9px 12px;border-radius:9px;font-size:12.5px;margin-bottom:14px;}
+.login-hint{font-size:11.5px;opacity:0.5;margin-top:14px;}
+.spinner{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;margin-right:6px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.empty-state{opacity:0.5;text-align:center;padding:24px 12px;font-size:13px;}
+/* ---------- Kalkulation ---------- */
+.result-hero{
+  border-radius:14px;padding:18px;margin-bottom:14px;text-align:center;
+  border:1px solid var(--line);background:var(--ink);
+}
+.result-hero .big{font-family:'Marcellus',serif;font-size:40px;line-height:1.1;}
+.result-hero .lbl{font-size:11px;text-transform:uppercase;letter-spacing:0.07em;color:var(--gold-soft);opacity:0.85;}
+.result-hero .verdict{font-size:13px;margin-top:6px;font-weight:600;}
+.result-hero.good{border-color:var(--ok);background:rgba(92,131,98,0.18);}
+.result-hero.mid{border-color:var(--warn);background:rgba(201,121,62,0.16);}
+.result-hero.bad{border-color:var(--red-bright);background:rgba(143,29,51,0.25);}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+.kpi{background:var(--ink);border:1px solid var(--line);border-radius:12px;padding:10px 12px;}
+.kpi .lbl{font-size:10.5px;text-transform:uppercase;letter-spacing:0.05em;color:var(--gold-soft);opacity:0.8;}
+.kpi .val{font-size:18px;font-weight:700;margin-top:2px;}
+.kpi .sub{font-size:11px;opacity:0.6;margin-top:2px;}
+table.calc{width:100%;border-collapse:collapse;}
+table.calc td{padding:6px 4px;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.05);}
+table.calc td.num{text-align:right;white-space:nowrap;}
+table.calc tr.sum td{font-weight:700;color:var(--gold-soft);border-top:1px solid var(--line);}
+table.calc tr.minus td:first-child{opacity:0.85;}
+.rate-good{color:#9fd3a8;font-weight:700;}
+.rate-mid{color:#f0b07a;font-weight:700;}
+.rate-bad{color:#f2a0b0;font-weight:700;}
+details.settings summary{cursor:pointer;font-family:'Marcellus',serif;font-size:19px;color:var(--gold-soft);list-style:none;}
+details.settings summary::-webkit-details-marker{display:none;}
+details.settings summary::after{content:' ▾';font-size:14px;opacity:0.6;}
+details.settings[open] summary::after{content:' ▴';}
+.saved-flag{font-size:11px;color:#9fd3a8;opacity:0;transition:opacity .3s;margin-left:8px;}
+.saved-flag.show{opacity:1;}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js';
+import {
+  getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut,
+  GoogleAuthProvider, signInWithPopup
+} from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js';
+import {
+  initializeFirestore, doc, collection, onSnapshot, setDoc
+} from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js';
+
+function showFatalError(title, detail){
+  const el = document.getElementById('app');
+  if(!el) return;
+  el.innerHTML = `<div style="max-width:600px;margin:60px auto;padding:20px;background:#2a1116;border:1px solid #b02942;border-radius:14px;color:#f6efe2;font-family:sans-serif;">
+    <h2 style="color:#f2c9d1;margin-top:0;">${(title||'').toString().replace(/</g,'&lt;')}</h2>
+    <p style="font-size:13px;opacity:0.85;white-space:pre-wrap;word-break:break-word;">${(detail||'').toString().replace(/</g,'&lt;')}</p>
+    <p style="font-size:12px;opacity:0.6;">Bitte mach hiervon einen Screenshot.</p>
+  </div>`;
+}
+window.addEventListener('error', (ev)=>{ showFatalError('Es ist ein Fehler aufgetreten', (ev.message||'')+' ('+(ev.filename||'')+':'+(ev.lineno||'')+')'); });
+window.addEventListener('unhandledrejection', (ev)=>{ showFatalError('Es ist ein Fehler aufgetreten', ev.reason && ev.reason.message ? ev.reason.message : String(ev.reason)); });
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA0y6NWpF3N7241mA72Cj-gU_pvbqpNdD4",
+  authDomain: "red-lotus-eventkalender.firebaseapp.com",
+  projectId: "red-lotus-eventkalender",
+  storageBucket: "red-lotus-eventkalender.firebasestorage.app",
+  messagingSenderId: "864967561482",
+  appId: "1:864967561482:web:98ee51f304748e511f2af3"
+};
+const fbApp = initializeApp(firebaseConfig);
+const auth = getAuth(fbApp);
+const db = initializeFirestore(fbApp, { experimentalAutoDetectLongPolling: true }, "default");
+const googleProvider = new GoogleAuthProvider();
+
+const FELIX_EMAIL = 'felix.vonheyking@gmail.com';
+const PEARL_EMAIL = 'beepowpaw@gmail.com';
+
+// Gleiche Regeln wie in index.html (NEBENKOSTEN / eventDishTotal) — bei
+// Änderungen dort bitte hier nachziehen.
+const NEBENKOSTEN = {'Foodtruckcatering':{type:'flat',value:700},'Buffet':{type:'flat',value:550},'Minibuffet mit Lieferung':{type:'perPerson',value:2}};
+function computeNebenkosten(art,people,overrideVal){
+  if(overrideVal!==null && overrideVal!==undefined && overrideVal!=='null') return parseFloat(overrideVal)||0;
+  const rule = NEBENKOSTEN[art];
+  if(!rule) return 0;
+  if(rule.type==='flat') return rule.value;
+  if(rule.type==='perPerson') return rule.value*(parseFloat(people)||0);
+  return 0;
+}
+function eventDishTotal(evt){
+  return (evt.dishes||[]).reduce((s,d)=>s+((+d.unitPrice||0)*(+d.qty||0)*(+d.factor||1)),0);
+}
+
+// Werte aus den Gesprächen vom 07./08.11.2026. Alles ist unten unter
+// "Grundwerte" änderbar und wird in Firestore (settings/kalkulation)
+// gespeichert. Die Preisregeln (Staffel, Aufpreise, Mindestumsatz, Anfahrt,
+// Anzahlung, Bedingungen) liest auch der Kalender (index.html, PREIS_DEFAULTS)
+// für Angebote und Rechnungen — Schlüsselnamen dort bitte gleich halten.
+const BEDINGUNGEN_DEFAULT = [
+  'Leistung: Foodtruck-Catering mit {inkl} Hauptgerichten inkl. Reis, 3 Stunden Essensausgabe, Speisen so viel jeder möchte (kalkuliert mit 1,5 Portionen pro Gast). Plastikfreies Einweggeschirr und Besteck inklusive.',
+  'Anzahlung: {anzahlung} % des Gesamtbetrags bei Auftragsbestätigung; die Anzahlung wird mit der Schlussrechnung verrechnet.',
+  'Gästezahl: Bis 1 Monat vor der Veranstaltung kann die Gästezahl kostenfrei um bis zu 25 % reduziert werden, bis 2 Wochen vorher um bis zu 10 %. Danach ist keine Reduzierung mehr möglich, da der Einkauf bereits erfolgt ist.',
+  'Stornierung: Bis 2 Monate vor der Veranstaltung kostenfrei. Danach berechnen wir vom Auftragswert: weniger als 2 Monate vorher 15 %, weniger als 1 Monat vorher 25 %, weniger als 2 Wochen vorher 50 %, in der Woche der Veranstaltung 100 %. Ausgenommen sind Todesfall, schwere Erkrankung oder Geburt im engsten Kreis.'
+].join('\n');
+const DEFAULTS = {
+  // --- Preisliste (gilt auch für Angebote im Kalender)
+  staffel1Preis: 20, staffel2Ab: 150, staffel2Preis: 19, staffel3Ab: 250, staffel3Preis: 18,
+  gerichteInklusive: 2,    // Hauptgerichte im Staffelpreis (Reis immer dabei)
+  aufpreisGericht: 2.5,    // € brutto p. P. je weiteres Hauptgericht
+  premiumAufpreis: 3,      // € brutto p. P. je Rind-/Fisch-/Seafood-Gericht
+  porzellanAufpreis: 2.5,  // € brutto p. P.
+  mindestumsatz: 1500,     // € brutto Speisen (ohne Pauschale, Porzellan, Anfahrt)
+  anfahrtFreiKm: 50,       // einfache Strecke ohne Zuschlag
+  anfahrtProKm: 1.5,       // € brutto je km darüber, Hin- und Rückweg
+  anzahlungPct: 25,
+  nebenkostenStandard: 700,// € brutto, wie "Foodtruckcatering automatisch" im Kalender
+  bedingungen: BEDINGUNGEN_DEFAULT,
+  // --- Kosten (nur intern)
+  wareJePortion: 2.80,     // € netto: ~25 % von 10,19 € netto Marktpreis + Schwund
+  portionenProGast: 1.5,   // so viel jeder will, 3 Std. — kalkuliert mit 1,5
+  premiumMehrkosten: 0.75, // € netto je Gast und Rind-/Seafood-Gericht
+  extrasWareQuote: 30,     // % Wareneinsatz bei Vorspeisen/Desserts
+  einwegKosten: 0.50,      // € netto je Gast
+  porzellanKosten: 1.50,   // € netto je Gast (Miete/Spülen/Bruch)
+  fixProTag: 122,          // Truck + Auto ÷ Einsatztage
+  kmSatz: 0.50,            // € je gefahrenem km (Sprit + Verschleiß)
+  sonstiges: 40,           // Gas, Strom, Spülmittel je Event
+  pearlKosten: 17,         // € je Stunde inkl. Arbeitgeberanteil
+  minijobKosten: 22,       // € je Stunde inkl. Pauschalabgaben
+  stundenBasis: 9, stundenProGast: 0.05, stundenProGericht: 1,
+  minijobAb: 100, minijobStunden: 7,
+  // --- Ziel
+  saisonVon: 5, saisonBis: 9,
+  zielLohn: 80, zielLohnSaison: 100, minLohn: 52
+};
+const SETTING_FIELDS = [
+  ['Preisliste (gilt auch im Kalender)', [
+    ['staffel1Preis','Preis p. P. bis Stufe 2','€ brutto','Für die inklusiven Hauptgerichte + Reis.',0.5],
+    ['staffel2Ab','Stufe 2 ab Gästen','Gäste','',10],
+    ['staffel2Preis','Preis p. P. Stufe 2','€ brutto','',0.5],
+    ['staffel3Ab','Stufe 3 ab Gästen','Gäste','',10],
+    ['staffel3Preis','Preis p. P. Stufe 3','€ brutto','',0.5],
+    ['gerichteInklusive','Hauptgerichte im Preis','Anzahl','',1],
+    ['aufpreisGericht','Aufpreis je weiteres Hauptgericht','€ brutto p. P.','',0.5],
+    ['premiumAufpreis','Aufpreis Rind/Fisch/Seafood','€ brutto p. P. je Gericht','',0.5],
+    ['porzellanAufpreis','Aufpreis Porzellan','€ brutto p. P.','',0.5],
+    ['mindestumsatz','Mindestumsatz Speisen','€ brutto','Ohne Pauschale, Porzellan, Anfahrt. Liegt der Speisenumsatz darunter, wird die Differenz als „Mindestumsatz-Ausgleich“ berechnet.',50],
+    ['anfahrtFreiKm','Anfahrt frei bis','km (einfach)','',5],
+    ['anfahrtProKm','Anfahrtszuschlag','€ brutto je km','Gezählt wird Hin- und Rückweg über der Freigrenze.',0.1],
+    ['anzahlungPct','Anzahlung','%','',5],
+    ['nebenkostenStandard','Nebenkostenpauschale Standard','€ brutto','Vorschlag für neue Kalkulationen.',10],
+  ]],
+  ['Kosten', [
+    ['wareJePortion','Ware je Portion','€ netto','Startwert: 25 % von 10,19 € netto + etwas Schwund. Mit echten Belegen nachschärfen.',0.05],
+    ['portionenProGast','Portionen je Gast','Anzahl','',0.1],
+    ['premiumMehrkosten','Mehrkosten Rind/Seafood','€ netto je Gast und Gericht','',0.05],
+    ['extrasWareQuote','Wareneinsatz Vorspeisen/Desserts','%','',1],
+    ['einwegKosten','Einweggeschirr je Gast','€ netto','Bitte mit deinem echten Einkaufspreis ersetzen.',0.05],
+    ['porzellanKosten','Porzellan: deine Kosten','€ netto je Gast','',0.1],
+    ['fixProTag','Fixkosten je Einsatztag','€','Truck + Auto ÷ Einsatztage im Jahr.',1],
+    ['kmSatz','Fahrtkosten je km','€','Sprit + Verschleiß, Hin- und Rückweg.',0.05],
+    ['sonstiges','Sonstiges je Event','€','Gas, Strom, Spülmittel.',5],
+  ]],
+  ['Personal', [
+    ['pearlKosten','Pearl je Stunde','€','Echte Kosten inkl. Arbeitgeberanteil.',0.5],
+    ['minijobKosten','Minijob je Stunde','€','',0.5],
+    ['stundenBasis','Grundstunden je Person','h','Einkauf, Vorbereitung, Fahrt, Auf-/Abbau, Putzen.',0.5],
+    ['stundenProGast','Zusatzstunden je Gast','h','Je Person. 0,05 → 60 Gäste = 12 h.',0.01],
+    ['stundenProGericht','Mehrarbeit je weiteres Gericht','h je Person','',0.5],
+    ['minijobAb','Minijobberin ab Gästen','Gäste','',10],
+    ['minijobStunden','Minijob-Stunden je Event','h','',0.5],
+  ]],
+  ['Ziel', [
+    ['saisonVon','Hauptsaison ab Monat','1–12','',1],
+    ['saisonBis','Hauptsaison bis Monat','1–12','',1],
+    ['zielLohn','Ziel-Stundenlohn Nebensaison','€','',1],
+    ['zielLohnSaison','Ziel-Stundenlohn Hauptsaison','€','',1],
+    ['minLohn','Deine Untergrenze','€','',1],
+  ]]
+];
+
+function escapeHtml(s){
+  return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function fmtEUR(n){ return (Number(n)||0).toLocaleString('de-DE',{style:'currency',currency:'EUR'}); }
+function fmtNum(n,d=1){ return (Number(n)||0).toLocaleString('de-DE',{maximumFractionDigits:d}); }
+function num(v,fallback=0){ const x = parseFloat(String(v).replace(',','.')); return isNaN(x)?fallback:x; }
+function roundUpHalf(x){ return Math.ceil(x*2)/2; }
+function todayISO(){ const d=new Date(); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
+
+const state = {
+  authUser:null, authBusy:false, authError:null,
+  loaded:false, settings:{...DEFAULTS}, events:[],
+  input:{ eventId:'', datum:todayISO(), gaeste:60, km:35, grundpreis:'', extras:'', nebenkosten:DEFAULTS.nebenkostenStandard,
+          gerichte:2, premium:0, rabatt:'', porzellan:false, anzahlung:true, stdFelix:null, stdPearl:null, minijob:null }
+};
+let unsubSettings=null, unsubEvents=null, saveTimer=null;
+
+/* ============================= RECHNUNG ============================= */
+function S(k){
+  if(k==='bedingungen'){ const v = state.settings.bedingungen; return (v==null||v==='') ? DEFAULTS.bedingungen : v; }
+  return num(state.settings[k], DEFAULTS[k]);
+}
+function staffelPreis(g){ return g >= S('staffel3Ab') ? S('staffel3Preis') : (g >= S('staffel2Ab') ? S('staffel2Preis') : S('staffel1Preis')); }
+function extraGerichte(n){ return Math.max(0, n - S('gerichteInklusive')); }
+function aufpreiseProKopf(p){ return extraGerichte(p.gerichte)*S('aufpreisGericht') + p.premium*S('premiumAufpreis'); }
+function autoHours(g, gerichte){ return S('stundenBasis') + S('stundenProGast')*g + extraGerichte(gerichte)*S('stundenProGericht'); }
+function autoMinijob(g){ return g >= S('minijobAb') ? S('minijobStunden') : 0; }
+function istHauptsaison(datumISO){
+  const m = datumISO ? new Date(datumISO+'T00:00:00').getMonth()+1 : new Date().getMonth()+1;
+  const von = S('saisonVon'), bis = S('saisonBis');
+  return von <= bis ? (m>=von && m<=bis) : (m>=von || m<=bis);
+}
+function zielFuer(p){ return p.hauptsaison ? S('zielLohnSaison') : S('zielLohn'); }
+
+// Kosten, die nicht vom Verkaufspreis abhängen (alles netto).
+function kostenVon(p){
+  const g = Math.max(0, p.gaeste);
+  const ware = g*S('portionenProGast')*S('wareJePortion') + g*p.premium*S('premiumMehrkosten') + (p.extras/1.07)*S('extrasWareQuote')/100;
+  const geschirr = g * (p.porzellan ? S('porzellanKosten') : S('einwegKosten'));
+  const fahrt = p.km * 2 * S('kmSatz');
+  const sonst = S('sonstiges');
+  const pearl = p.stdPearl * S('pearlKosten');
+  const minijob = p.minijob * S('minijobKosten');
+  const fix = S('fixProTag');
+  return { ware, geschirr, fahrt, sonst, pearl, minijob, fix, summe: ware+geschirr+fahrt+sonst+pearl+minijob+fix };
+}
+function zuschlaege(p){
+  const porzellan = p.porzellan ? Math.max(0,p.gaeste)*S('porzellanAufpreis') : 0;
+  const mehrKm = Math.max(0, p.km - S('anfahrtFreiKm'));
+  const anfahrt = p.legacy ? 0 : mehrKm*2*S('anfahrtProKm'); // alte Angebote kannten keinen Anfahrtszuschlag
+  return { porzellan, mehrKm, anfahrt };
+}
+// Gleiche Logik wie computeOffer() im Kalender (Positionen brutto, alles 7 %).
+function calc(p){
+  const g = Math.max(0, p.gaeste);
+  const basis = p.grundpreis==null ? staffelPreis(g) : p.grundpreis;
+  const proKopf = basis + aufpreiseProKopf(p);
+  const speisenVorRabatt = g*proKopf + p.extras;
+  const rabattBetrag = Math.round(speisenVorRabatt*p.rabatt)/100;
+  const nachRabatt = speisenVorRabatt - rabattBetrag;
+  const mindestAktiv = !p.legacy && g>0 && nachRabatt < S('mindestumsatz');
+  const speisen = mindestAktiv ? S('mindestumsatz') : nachRabatt;
+  const z = zuschlaege(p);
+  const bruttoGesamt = speisen + z.porzellan + z.anfahrt + p.nebenkosten;
+  const umsatzNetto = bruttoGesamt/1.07;
+  const k = kostenVon(p);
+  const felix = umsatzNetto - k.summe;
+  const lohn = p.stdFelix > 0 ? felix/p.stdFelix : 0;
+  const anzahlung = p.anzahlung ? bruttoGesamt*S('anzahlungPct')/100 : 0;
+  return { g, basis, proKopf, speisenVorRabatt, rabattBetrag, nachRabatt, mindestAktiv, speisen, ...z, bruttoGesamt, umsatzNetto,
+           k, felix, lohn, anzahlung, proKopfAllIn: g>0 ? bruttoGesamt/g : 0 };
+}
+// Grundpreis p. P. (brutto, für die inklusiven Hauptgerichte), bei dem Felix
+// genau zielLohnWert je Stunde verdient. Mindestumsatz wird separat angezeigt.
+function preisFuerLohn(p, zielLohnWert){
+  if(p.gaeste<=0) return 0;
+  const k = kostenVon(p), z = zuschlaege(p);
+  const bruttoNoetig = (zielLohnWert*p.stdFelix + k.summe) * 1.07;
+  const speisenNoetig = bruttoNoetig - z.porzellan - z.anfahrt - p.nebenkosten;
+  const vorRabatt = speisenNoetig / Math.max(0.01, 1 - p.rabatt/100);
+  return Math.max(0, (vorRabatt - p.extras)/p.gaeste - aufpreiseProKopf(p));
+}
+function rateClass(l, ziel){ return l >= ziel ? 'good' : (l >= S('minLohn') ? 'mid' : 'bad'); }
+function currentParams(){
+  const i = state.input, g = num(i.gaeste), gerichte = Math.max(1, Math.round(num(i.gerichte,2)));
+  const premium = Math.min(gerichte, Math.max(0, Math.round(num(i.premium,0))));
+  const auto = autoHours(g, gerichte);
+  const gp = String(i.grundpreis??'').trim();
+  return {
+    gaeste: g, km: num(i.km), grundpreis: gp==='' ? null : num(gp), extras: num(i.extras), nebenkosten: num(i.nebenkosten),
+    gerichte, premium, rabatt: Math.min(100, Math.max(0, num(i.rabatt))), porzellan: !!i.porzellan, anzahlung: i.anzahlung!==false,
+    hauptsaison: istHauptsaison(i.datum), legacy: !!i.legacy,
+    stdFelix: i.stdFelix==null || i.stdFelix==='' ? auto : num(i.stdFelix),
+    stdPearl: i.stdPearl==null || i.stdPearl==='' ? auto : num(i.stdPearl),
+    minijob: i.minijob==null || i.minijob==='' ? autoMinijob(g) : num(i.minijob),
+    autoStd: auto, autoMini: autoMinijob(g)
+  };
+}
+
+/* ============================= LOGIN ============================= */
+function renderLogin(){
+  return `
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="brand-mark" style="margin:0 auto 10px;">📊</div>
+      <h1 class="wordmark">Kalkulation</h1>
+      <div class="sub">Red Lotus · Catering-Angebote</div>
+      ${state.authError ? `<div class="login-error">${escapeHtml(state.authError)}</div>` : ''}
+      <button type="button" class="btn gold" id="googleLoginBtn" ${state.authBusy?'disabled':''} style="width:100%;margin-bottom:16px;">${state.authBusy?'Anmelden…':'Mit Google anmelden'}</button>
+      <div class="field"><label>E-Mail</label><input type="email" id="login-email" autocomplete="username"></div>
+      <div class="field"><label>Passwort</label><input type="password" id="login-pass" autocomplete="current-password"></div>
+      <button type="button" class="btn ghost" id="loginBtn" ${state.authBusy?'disabled':''} style="width:100%;padding:11px;">Mit E-Mail anmelden</button>
+      <div class="login-hint">Gleicher Zugang wie im Red-Lotus-Eventkalender.</div>
+    </div>
+  </div>`;
+}
+function mapAuthError(e){
+  const code = e && e.code || '';
+  if(code.includes('invalid-credential') || code.includes('wrong-password') || code.includes('user-not-found')) return 'E-Mail oder Passwort ist falsch.';
+  if(code.includes('popup-closed-by-user') || code.includes('cancelled-popup-request')) return 'Google-Anmeldung abgebrochen.';
+  if(code.includes('popup-blocked')) return 'Der Anmelde-Pop-up wurde blockiert. Bitte Pop-ups erlauben.';
+  return 'Anmeldung fehlgeschlagen: '+(e.message||e);
+}
+function attachLoginHandlers(){
+  const doLogin = async ()=>{
+    const email = document.getElementById('login-email').value.trim();
+    const pass = document.getElementById('login-pass').value;
+    if(!email || !pass){ state.authError='Bitte E-Mail und Passwort eingeben.'; render(); return; }
+    state.authBusy=true; state.authError=null; render();
+    try{ await signInWithEmailAndPassword(auth, email, pass); }
+    catch(e){ state.authBusy=false; state.authError=mapAuthError(e); render(); }
+  };
+  document.getElementById('loginBtn').onclick = doLogin;
+  document.getElementById('googleLoginBtn').onclick = async ()=>{
+    state.authBusy=true; state.authError=null; render();
+    try{ await signInWithPopup(auth, googleProvider); }
+    catch(e){ state.authBusy=false; state.authError=mapAuthError(e); render(); }
+  };
+}
+
+/* ============================= DATEN ============================= */
+function startSync(){
+  let sReady=false, eReady=false;
+  const done = ()=>{ if(sReady && eReady && !state.loaded){ state.loaded=true; state.input.nebenkosten = S('nebenkostenStandard'); render(); } };
+  unsubSettings = onSnapshot(doc(db,'settings','kalkulation'), d=>{
+    state.settings = {...DEFAULTS, ...(d.exists()?d.data():{})};
+    sReady=true; if(state.loaded) updateResults(); done();
+  }, err=>{ console.error('Firestore (settings/kalkulation):', err); sReady=true; done(); });
+  unsubEvents = onSnapshot(collection(db,'events'), snap=>{
+    state.events = snap.docs.map(d=>({id:d.id, ...d.data()}))
+      .filter(e => (e.category||'event')==='event' && num(e.people)>0)
+      .sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+    eReady=true; if(state.loaded) refreshEventSelect(); done();
+  }, err=>{ console.error('Firestore (events):', err); eReady=true; done(); });
+}
+function stopSync(){ if(unsubSettings) unsubSettings(); if(unsubEvents) unsubEvents(); }
+function scheduleSave(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async ()=>{
+    try{
+      await setDoc(doc(db,'settings','kalkulation'), state.settings);
+      const f = document.getElementById('savedFlag');
+      if(f){ f.classList.add('show'); setTimeout(()=>f.classList.remove('show'), 1500); }
+    }catch(e){ alert('Speichern fehlgeschlagen: '+(e.message||e)); }
+  }, 600);
+}
+
+/* ============================= RENDER ============================= */
+function eventOptions(){
+  return `<option value="">— Neue Kalkulation —</option>` + state.events.slice(0,60).map(e=>{
+    const d = e.date ? new Date(e.date+'T00:00:00').toLocaleDateString('de-DE') : '';
+    const name = e.company || e.anlass || e.name || 'Event';
+    return `<option value="${escapeHtml(e.id)}" ${state.input.eventId===e.id?'selected':''}>${d} · ${escapeHtml(name)} · ${num(e.people)} P.</option>`;
+  }).join('');
+}
+function refreshEventSelect(){ const s=document.getElementById('in-event'); if(s) s.innerHTML = eventOptions(); }
+
+function settingInput([k,label,unit,hint,step]){
+  return `<div class="field">
+    <label>${label} (${unit})</label>
+    <input type="number" inputmode="decimal" step="${step}" data-setting="${k}" value="${escapeHtml(state.settings[k])}">
+    ${hint?`<div class="hint">${hint}</div>`:''}
+  </div>`;
+}
+
+function renderApp(){
+  const i = state.input;
+  return `
+  <header class="top">
+    <div class="brand"><div class="brand-mark">📊</div>
+      <div><h1 class="wordmark">Kalkulation</h1><div class="sub">Catering-Angebote</div></div></div>
+    <nav class="suite-nav">
+      <a href="index.html">📅 Kalender</a>
+      <a class="active" href="kalkulation.html">📊 Kalkulation</a>
+      <a href="loehne.html">💰 Löhne</a>
+    </nav>
+    <button type="button" class="btn ghost sm" id="logoutBtn">Abmelden</button>
+  </header>
+  <div class="app">
+    <div class="panel">
+      <h3>Angebot durchrechnen</h3>
+      <div class="field"><label>Aus dem Kalender laden (optional)</label>
+        <select id="in-event">${eventOptions()}</select>
+        <div class="hint">Übernimmt Gäste, Gerichte, Vorspeisen/Desserts, Pauschale, Preisregel und erfasste Stunden.</div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Datum</label><input type="date" id="in-datum" value="${i.datum}"><div class="hint" id="saisonHint"></div></div>
+        <div class="field"><label>Gäste</label><input type="number" inputmode="numeric" min="1" step="1" id="in-gaeste" value="${i.gaeste}"><div class="hint" id="staffelHint"></div></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Hauptgerichte</label><input type="number" inputmode="numeric" min="1" step="1" id="in-gerichte" value="${i.gerichte}"><div class="hint">${fmtNum(S('gerichteInklusive'),0)} inklusive, jedes weitere +${fmtEUR(S('aufpreisGericht'))} p. P.</div></div>
+        <div class="field"><label>davon Rind/Fisch/Seafood</label><input type="number" inputmode="numeric" min="0" step="1" id="in-premium" value="${i.premium}"><div class="hint">je +${fmtEUR(S('premiumAufpreis'))} p. P.</div></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Vorspeisen/Desserts (brutto gesamt)</label><input type="number" inputmode="decimal" min="0" step="10" id="in-extras" value="${i.extras}" placeholder="0"><div class="hint">Stückpreise nach Karte zusammengezählt.</div></div>
+        <div class="field"><label>Entfernung einfach (km)</label><input type="number" inputmode="decimal" min="0" step="1" id="in-km" value="${i.km}"><div class="hint">Zuschlag ab ${fmtNum(S('anfahrtFreiKm'),0)} km.</div></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Grundpreis p. P. (brutto)</label><input type="number" inputmode="decimal" min="0" step="0.5" id="in-grundpreis" value="${i.grundpreis}" placeholder="leer = Preisliste"><div class="hint">Leer lassen = Preis aus der Staffel.</div></div>
+        <div class="field"><label>Nebenkostenpauschale (brutto)</label><input type="number" inputmode="decimal" min="0" step="10" id="in-neben" value="${i.nebenkosten}"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Rabatt auf Speisen (%)</label><input type="number" inputmode="decimal" min="0" max="100" step="1" id="in-rabatt" value="${i.rabatt}" placeholder="0"></div>
+        <div class="field" style="display:flex;flex-direction:column;justify-content:center;gap:6px;">
+          <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13.5px;color:var(--cream);cursor:pointer;margin:0;">
+            <input type="checkbox" id="in-porzellan" ${i.porzellan?'checked':''} style="width:18px;height:18px;"> Porzellan (+${fmtEUR(S('porzellanAufpreis'))} p. P.)</label>
+          <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13.5px;color:var(--cream);cursor:pointer;margin:0;">
+            <input type="checkbox" id="in-anzahlung" ${i.anzahlung!==false?'checked':''} style="width:18px;height:18px;"> ${fmtNum(S('anzahlungPct'),0)} % Anzahlung</label>
+        </div>
+      </div>
+      <div class="field-row3">
+        <div class="field"><label>Stunden Felix</label><input type="number" inputmode="decimal" min="0" step="0.5" id="in-stdFelix" value="${i.stdFelix??''}"></div>
+        <div class="field"><label>Stunden Pearl</label><input type="number" inputmode="decimal" min="0" step="0.5" id="in-stdPearl" value="${i.stdPearl??''}"></div>
+        <div class="field"><label>Minijob-Stunden</label><input type="number" inputmode="decimal" min="0" step="0.5" id="in-minijob" value="${i.minijob??''}"></div>
+      </div>
+      <div class="hint" id="autoHint" style="margin-top:-6px;"></div>
+    </div>
+
+    <div class="panel" id="results"></div>
+
+    <div class="panel">
+      <h3>Preisliste &amp; Schnellübersicht</h3>
+      <p class="hint" style="margin:-6px 0 10px;">Mit deinen aktuellen Gerichten, Entfernung und Pauschale; Stunden automatisch geschätzt, ohne Vorspeisen/Desserts und Rabatt.</p>
+      <div class="table-scroll" id="scenarios"></div>
+    </div>
+
+    <div class="panel">
+      <details class="settings">
+        <summary>Grundwerte<span class="saved-flag" id="savedFlag">✓ gespeichert</span></summary>
+        <p class="hint" style="margin:8px 0 12px;">Einmal einstellen, gilt für alle Kalkulationen. Die Preisliste und die Bedingungen nutzt auch der Kalender für Angebote und Rechnungen.</p>
+        ${SETTING_FIELDS.map(([title, fields])=>`
+          <div class="sub-title" style="margin-top:14px;">${title}</div>
+          ${fields.map(settingInput).join('')}
+        `).join('')}
+        <div class="sub-title" style="margin-top:14px;">Bedingungen im Angebot</div>
+        <div class="field">
+          <textarea id="set-bedingungen" rows="9" style="width:100%;background:var(--ink);border:1px solid var(--line);color:var(--cream);padding:8px 10px;border-radius:9px;font-size:13px;font-family:'Work Sans',sans-serif;">${escapeHtml(S('bedingungen'))}</textarea>
+          <div class="hint">Ein Absatz pro Zeile. {inkl} = Hauptgerichte im Preis, {anzahlung} = Anzahlung in %. Der Anzahlungs-Absatz entfällt automatisch, wenn bei einem Termin keine Anzahlung verlangt wird. Bitte einmal rechtlich prüfen lassen.</div>
+        </div>
+        <button type="button" class="btn ghost sm" id="resetDefaults">Startwerte wiederherstellen</button>
+      </details>
+    </div>
+  </div>`;
+}
+
+function updateResults(){
+  const p = currentParams();
+  const r = calc(p);
+  const ziel = zielFuer(p);
+  const cls = rateClass(r.lohn, ziel);
+  const verdict = cls==='good' ? 'Über deinem Ziel – gutes Angebot'
+                : cls==='mid' ? 'Zwischen Untergrenze und Ziel – okay, aber nachschärfen'
+                : 'Unter deiner Untergrenze – so nicht annehmen';
+  const aufs = aufpreiseProKopf(p);
+  const minGrund = p.gaeste>0 ? ((S('mindestumsatz')/Math.max(0.01,1-p.rabatt/100)) - p.extras)/p.gaeste - aufs : 0;
+  const pZielRoh = roundUpHalf(preisFuerLohn(p, ziel)), pMinRoh = roundUpHalf(preisFuerLohn(p, S('minLohn')));
+  const pZiel = Math.max(pZielRoh, roundUpHalf(minGrund)), pMin = Math.max(pMinRoh, roundUpHalf(minGrund));
+
+  const set = (id, txt)=>{ const el=document.getElementById(id); if(el) el.textContent = txt; };
+  set('autoHint', `Leer lassen = automatisch: ${fmtNum(p.autoStd)} h je Person, Minijob ${fmtNum(p.autoMini)} h.`);
+  set('saisonHint', `${p.hauptsaison?'Hauptsaison':'Nebensaison'} – Ziel ${fmtEUR(ziel)}/h`);
+  set('staffelHint', `Preisliste: ${fmtEUR(staffelPreis(p.gaeste))} p. P.`);
+  ['stdFelix','stdPearl','minijob'].forEach(k=>{
+    const el = document.getElementById('in-'+k);
+    if(el) el.placeholder = fmtNum(k==='minijob'?p.autoMini:p.autoStd);
+  });
+
+  const lines = [];
+  lines.push([`${fmtNum(r.g,0)} × ${fmtEUR(r.basis)} ${p.grundpreis==null?'(Preisliste)':'(manuell)'}`, r.g*r.basis]);
+  if(extraGerichte(p.gerichte)) lines.push([`Aufpreis ${extraGerichte(p.gerichte)} weiteres Gericht`, r.g*extraGerichte(p.gerichte)*S('aufpreisGericht')]);
+  if(p.premium) lines.push([`Aufpreis Rind/Fisch/Seafood (${p.premium})`, r.g*p.premium*S('premiumAufpreis')]);
+  if(p.extras) lines.push(['Vorspeisen/Desserts', p.extras]);
+  if(r.rabattBetrag) lines.push([`Rabatt ${fmtNum(p.rabatt)} %`, -r.rabattBetrag]);
+  if(r.mindestAktiv) lines.push(['Mindestumsatz-Ausgleich', S('mindestumsatz')-r.nachRabatt]);
+  if(r.porzellan) lines.push(['Porzellan', r.porzellan]);
+  if(r.anfahrt) lines.push([`Anfahrtszuschlag (${fmtNum(r.mehrKm,0)} km × 2)`, r.anfahrt]);
+  lines.push(['Nebenkostenpauschale', p.nebenkosten]);
+
+  const mindestBox = r.mindestAktiv ? `
+    <div class="login-error" style="text-align:left;margin-bottom:14px;background:rgba(201,121,62,0.16);border-color:var(--warn);color:var(--cream);">
+      <b>Mindestumsatz greift:</b> Speisen ${fmtEUR(r.nachRabatt)} liegen unter ${fmtEUR(S('mindestumsatz'))} – der Kunde zahlt ${fmtEUR(S('mindestumsatz')-r.nachRabatt)} Ausgleich.
+    </div>` : '';
+
+  document.getElementById('results').innerHTML = `
+    <div class="result-hero ${cls}">
+      <div class="lbl">Dein Stundenlohn bei diesem Angebot</div>
+      <div class="big">${fmtEUR(r.lohn)}</div>
+      <div class="verdict">${verdict}</div>
+      <div class="hint" style="margin-top:4px;">${p.hauptsaison?'Hauptsaison':'Nebensaison'}: Ziel ${fmtEUR(ziel)} · Untergrenze ${fmtEUR(S('minLohn'))} · vor Steuer &amp; Krankenversicherung</div>
+    </div>
+    ${mindestBox}
+    ${p.legacy ? `<div class="hint" style="margin:-4px 0 12px;">Altes Angebot nach Kartenpreisen geladen – ohne Mindestumsatz, so wie es tatsächlich abgerechnet wird.</div>` : ''}
+    <div class="kpis">
+      <div class="kpi"><div class="lbl">Kunde zahlt gesamt</div><div class="val">${fmtEUR(r.bruttoGesamt)}</div><div class="sub">= ${fmtEUR(r.proKopfAllIn)} p. P. alles inklusive${r.anzahlung?` · Anzahlung ${fmtEUR(r.anzahlung)}`:''}</div></div>
+      <div class="kpi"><div class="lbl">Grundpreis p. P. für dein Ziel</div><div class="val">${fmtEUR(pZiel)}</div><div class="sub">Preisliste: ${fmtEUR(staffelPreis(p.gaeste))} · Untergrenze: ${fmtEUR(pMin)}</div></div>
+    </div>
+    <div class="sub-title">So steht es im Angebot (brutto)</div>
+    <table class="calc">
+      ${lines.map(([t,v])=>`<tr><td>${t}</td><td class="num">${fmtEUR(v)}</td></tr>`).join('')}
+      <tr class="sum"><td>Gesamt brutto (netto ${fmtEUR(r.umsatzNetto)})</td><td class="num">${fmtEUR(r.bruttoGesamt)}</td></tr>
+    </table>
+    <div class="sub-title" style="margin-top:14px;">Was davon bei dir bleibt (netto)</div>
+    <table class="calc">
+      <tr><td>Umsatz netto</td><td class="num">${fmtEUR(r.umsatzNetto)}</td></tr>
+      <tr class="minus"><td>− Ware (${fmtNum(S('portionenProGast'))} Portionen × ${fmtEUR(S('wareJePortion'))}${p.premium?' + Rind/Seafood':''}${p.extras?' + Extras':''})</td><td class="num">${fmtEUR(r.k.ware)}</td></tr>
+      <tr class="minus"><td>− ${p.porzellan?'Porzellan':'Einweggeschirr'}</td><td class="num">${fmtEUR(r.k.geschirr)}</td></tr>
+      <tr class="minus"><td>− Fahrt (${fmtNum(p.km*2,0)} km)</td><td class="num">${fmtEUR(r.k.fahrt)}</td></tr>
+      <tr class="minus"><td>− Gas, Strom, Sonstiges</td><td class="num">${fmtEUR(r.k.sonst)}</td></tr>
+      <tr class="minus"><td>− Pearl (${fmtNum(p.stdPearl)} h)</td><td class="num">${fmtEUR(r.k.pearl)}</td></tr>
+      ${p.minijob>0?`<tr class="minus"><td>− Minijob (${fmtNum(p.minijob)} h)</td><td class="num">${fmtEUR(r.k.minijob)}</td></tr>`:''}
+      <tr class="minus"><td>− Anteil Truck/Auto-Fixkosten</td><td class="num">${fmtEUR(r.k.fix)}</td></tr>
+      <tr class="sum"><td>Bleibt für dich (${fmtNum(p.stdFelix)} h)</td><td class="num">${fmtEUR(r.felix)}</td></tr>
+    </table>`;
+
+  const sizes = [30,50,75,100,150,200,250,300];
+  document.getElementById('scenarios').innerHTML = `
+    <table class="dish-table">
+      <thead><tr><th>Gäste</th><th>Liste</th><th>Kunde zahlt</th><th>Dein Lohn</th><th>Für Ziel</th></tr></thead>
+      <tbody>${sizes.map(g=>{
+        const h = autoHours(g, p.gerichte);
+        const sp = {...p, gaeste:g, grundpreis:null, extras:0, rabatt:0, stdFelix:h, stdPearl:h, minijob:autoMinijob(g)};
+        const rr = calc(sp);
+        const roh = roundUpHalf(preisFuerLohn(sp, ziel));
+        const minG = roundUpHalf(S('mindestumsatz')/g - aufpreiseProKopf(sp));
+        const fz = minG > roh ? `<span title="Mindestumsatz greift">${fmtEUR(minG)}*</span>` : fmtEUR(roh);
+        return `<tr><td>${g}</td><td>${fmtEUR(staffelPreis(g))}${rr.mindestAktiv?'*':''}</td><td>${fmtEUR(rr.bruttoGesamt)}</td><td class="rate-${rateClass(rr.lohn,ziel)}">${fmtEUR(rr.lohn)}</td><td>${fz}</td></tr>`;
+      }).join('')}</tbody>
+    </table>
+    <div class="hint" style="margin-top:6px;">* Mindestumsatz von ${fmtEUR(S('mindestumsatz'))} greift – Kunde zahlt mindestens diesen Betrag für die Speisen. „Kunde zahlt“ inkl. Pauschale${p.porzellan?', Porzellan':''}${zuschlaege(p).anfahrt?', Anfahrt':''}.</div>`;
+}
+
+function loadEvent(id){
+  const e = state.events.find(x=>x.id===id);
+  state.input.eventId = id || '';
+  state.input.legacy = false;
+  if(!e){ render(); return; }
+  const people = num(e.people);
+  const dishes = e.dishes || [];
+  const isMain = d => d.category!=='vorspeisen' && d.category!=='desserts';
+  const mains = dishes.filter(isMain);
+  const extrasSum = dishes.filter(d=>!isMain(d)).reduce((t,d)=>t+(num(d.unitPrice)*num(d.qty)*num(d.factor,1)),0);
+  const th = e.teamHours || {};
+  const pr = e.preis || {};
+  state.input.gaeste = people;
+  state.input.datum = e.date || todayISO();
+  state.input.gerichte = Math.max(1, mains.length || 2);
+  state.input.premium = mains.filter(d=>['Rind','Fisch','Seafood'].includes(d.variant)).length;
+  state.input.extras = Math.round(extrasSum*100)/100 || '';
+  state.input.nebenkosten = computeNebenkosten(e.art||'Foodtruckcatering', people, e.nebenkostenOverride);
+  if(pr.modus==='staffel'){
+    state.input.grundpreis = '';
+    state.input.km = pr.km!==undefined && pr.km!=='' ? num(pr.km) : state.input.km;
+    state.input.rabatt = pr.rabatt || '';
+    state.input.porzellan = !!pr.porzellan;
+    state.input.anzahlung = pr.anzahlung!==false;
+  } else {
+    // Alte Berechnung: Kartenpreise der Hauptgerichte ergeben den Grundpreis.
+    const mainsTotal = mains.reduce((t,d)=>t+(num(d.unitPrice)*num(d.qty)*num(d.factor,1)),0);
+    const p0 = {gerichte:state.input.gerichte, premium:state.input.premium};
+    state.input.grundpreis = people>0 ? Math.round(Math.max(0, mainsTotal/people - aufpreiseProKopf(p0))*100)/100 : '';
+    state.input.rabatt = ''; state.input.porzellan = false; state.input.anzahlung = false;
+    state.input.legacy = true; // altes Angebot: kein Mindestumsatz, keine Anzahlung
+  }
+  state.input.stdFelix = th[FELIX_EMAIL] > 0 ? th[FELIX_EMAIL] : null;
+  state.input.stdPearl = th[PEARL_EMAIL] > 0 ? th[PEARL_EMAIL] : null;
+  state.input.minijob = null;
+  render();
+}
+
+function attachAppHandlers(){
+  document.getElementById('logoutBtn').onclick = ()=> signOut(auth);
+  document.getElementById('in-event').onchange = (ev)=> loadEvent(ev.target.value);
+  const map = {'in-datum':'datum','in-gaeste':'gaeste','in-gerichte':'gerichte','in-premium':'premium','in-extras':'extras','in-km':'km',
+               'in-grundpreis':'grundpreis','in-neben':'nebenkosten','in-rabatt':'rabatt','in-stdFelix':'stdFelix','in-stdPearl':'stdPearl','in-minijob':'minijob'};
+  Object.entries(map).forEach(([id,key])=>{
+    const el = document.getElementById(id);
+    el.oninput = ()=>{
+      const v = el.value.trim();
+      state.input[key] = (['stdFelix','stdPearl','minijob'].includes(key) && v==='') ? null : v;
+      updateResults();
+    };
+  });
+  document.getElementById('in-porzellan').onchange = (ev)=>{ state.input.porzellan = ev.target.checked; updateResults(); };
+  document.getElementById('in-anzahlung').onchange = (ev)=>{ state.input.anzahlung = ev.target.checked; updateResults(); };
+  document.querySelectorAll('[data-setting]').forEach(el=>{
+    el.oninput = ()=>{
+      const v = num(el.value, NaN);
+      if(isNaN(v)) return;
+      state.settings[el.dataset.setting] = v;
+      updateResults(); scheduleSave();
+    };
+  });
+  const bed = document.getElementById('set-bedingungen');
+  bed.oninput = ()=>{ state.settings.bedingungen = bed.value; scheduleSave(); };
+  document.getElementById('resetDefaults').onclick = ()=>{
+    if(!confirm('Alle Grundwerte (auch Preisliste und Bedingungen) auf die Startwerte zurücksetzen?')) return;
+    state.settings = {...DEFAULTS}; render(); scheduleSave();
+  };
+}
+
+function render(){
+  const app = document.getElementById('app');
+  if(!state.authUser){ app.innerHTML = renderLogin(); attachLoginHandlers(); return; }
+  if(!state.loaded){ app.innerHTML = `<div class="app"><p class="hint">Lade…</p></div>`; return; }
+  app.innerHTML = renderApp();
+  attachAppHandlers();
+  updateResults();
+}
+
+/* ============================= INIT ============================= */
+onAuthStateChanged(auth, (user)=>{
+  if(user){
+    state.authUser = user; state.authError = null; state.authBusy = false;
+    if(!state.loaded){ startSync(); }
+  } else {
+    state.authUser = null; state.loaded = false; stopSync();
+  }
+  render();
+});
+render();
+</script>
+</body>
+</html>

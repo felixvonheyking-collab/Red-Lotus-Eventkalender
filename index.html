@@ -423,6 +423,9 @@ table.inv-table{width:100%;border-collapse:collapse;margin-bottom:6px;}
 table.inv-table th{background:#8f1d33;color:#fff;font-size:11px;text-transform:uppercase;letter-spacing:0.03em;padding:7px 9px;text-align:left;}
 table.inv-table td{padding:7px 9px;font-size:12.5px;border-bottom:1px solid #e9ddc6;}
 table.inv-summary{width:100%;border-collapse:collapse;margin:2px 0 20px;}
+.inv-terms{font-size:10.5px;line-height:1.45;color:#3a3634;margin:4px 0 16px;border-top:1px solid #e9ddc6;padding-top:8px;}
+.inv-terms p{margin:0 0 5px;}
+.inv-anzahlung td{color:#6b1526;}
 table.inv-summary td{padding:6px 10px;font-size:12.5px;background:#f1efe9;border-bottom:2px solid #fff;}
 table.inv-summary tr.inv-total-row td{background:#8f1d33;color:#fff;}
 table.inv-dishes{width:100%;border-collapse:collapse;margin-bottom:20px;}
@@ -751,7 +754,7 @@ Datum: ${dateLabel}
 Art: ${evt.art || '—'}
 Personen: ${evt.people || '—'}
 Gerichte: ${dishNames}
-Summe (brutto): ${fmtEUR(total)}`;
+${isStaffel(evt) ? 'Angebot (brutto, inkl. Pauschale): '+fmtEUR(computeOffer(evt).totalBrutto) : 'Summe (brutto): '+fmtEUR(total)}`;
 }
 // async, weil die Kopfzeilen jetzt das Login-Token enthalten und dieses
 // asynchron geholt wird. Der Aufrufer wartet bewusst nicht darauf ab —
@@ -1619,6 +1622,7 @@ function getDishConfigForCategory(cat){
 }
 
 /* ============================= FIRESTORE-SYNC & LOGIN ============================= */
+let unsubPreisRegeln=null;
 let unsubEvents=null, unsubCustom=[], unsubCustomTL=[], unsubMeta=null, unsubSettings=null, unsubRecipes=null, unsubManualHours=null, unsubInventoryCore=null, unsubInventoryLists=null, unsubAblaufLists=null, unsubMarktstatus=[];
 const CUSTOM_CATS = ['curry','andereReis','nudeln','vorspeisen','desserts'];
 const CUSTOM_CATS_TL = ['vorspeisen','hauptspeisen','desserts','snacks','streetfood','getraenke'];
@@ -1643,6 +1647,13 @@ function startFirestoreSync(){
     state.storageOk = true;
     render();
   }, err=>{ console.error('Firestore-Fehler (dishMeta):', err); handleFirestoreError(err); });
+
+  // Preisregeln (Preisliste, Mindestumsatz, Zuschläge, Bedingungen) werden
+  // in kalkulation.html gepflegt und hier nur gelesen.
+  unsubPreisRegeln = onSnapshot(doc(db,'settings','kalkulation'), d=>{
+    state.preisRegeln = d.exists() ? d.data() : {};
+    render();
+  }, err=>{ console.error('Firestore-Fehler (settings/kalkulation):', err); });
 
   unsubSettings = onSnapshot(doc(db,'settings','main'), d=>{
     state.settings = d.exists() ? d.data() : {logo:null};
@@ -1725,6 +1736,7 @@ function stopFirestoreSync(){
   if(unsubEvents) unsubEvents();
   if(unsubMeta) unsubMeta();
   if(unsubSettings) unsubSettings();
+  if(unsubPreisRegeln) unsubPreisRegeln();
   unsubCustom.forEach(u=>u());
   unsubCustom=[];
   unsubCustomTL.forEach(u=>u());
@@ -1913,7 +1925,8 @@ function snapshotOfferFromEvent(evt){
     people: evt.people || '',
     art: evt.art || '',
     nebenkostenOverride: (evt.nebenkostenOverride===undefined) ? null : evt.nebenkostenOverride,
-    category: evt.category || 'event'
+    category: evt.category || 'event',
+    preis: evt.preis ? JSON.parse(JSON.stringify(evt.preis)) : null
   };
 }
 
@@ -2353,6 +2366,7 @@ function renderHeader(){
       <a href="einkaufsliste.html" class="btn ghost" style="text-decoration:none;display:inline-flex;align-items:center;" title="Einkaufsliste">🛒</a>
       <a href="inventarablauf.html" class="btn ghost" style="text-decoration:none;display:inline-flex;align-items:center;" title="Inventar &amp; Ablauf">📋</a>
       <a href="preisrechner.html" class="btn ghost" style="text-decoration:none;display:inline-flex;align-items:center;" title="Preisrechner">🧮</a>
+      <a href="kalkulation.html" class="btn ghost" style="text-decoration:none;display:inline-flex;align-items:center;" title="Catering-Kalkulation">📊</a>
       <a href="streetfood-karte.html" class="btn ghost" style="text-decoration:none;display:inline-flex;align-items:center;" title="Streetfood-Karte (Website)">🌶</a>
       <a href="alice.html" class="btn ghost" style="text-decoration:none;display:inline-flex;align-items:center;" title="Alice (E-Mail-Sekretärin)">🤖</a>
     </nav>
@@ -2426,7 +2440,9 @@ function renderEventRow(e){
   } else if(cat==='wochenmarkt' || cat==='festivalTL'){
     meta = `${(e.dishes||[]).length} Gerichte${e.address?' · '+escapeHtml(e.address):''}`;
   } else {
-    meta = `${escapeHtml(e.art||'—')} · ${e.people||'?'} Personen · ${(e.dishes||[]).length} Gerichte · Summe ${fmtEUR(total)}`;
+    meta = isStaffel(e)
+      ? `${escapeHtml(e.art||'—')} · ${e.people||'?'} Personen · ${(e.dishes||[]).length} Gerichte · Angebot ${fmtEUR(computeOffer(e).totalBrutto)} (Preisliste)`
+      : `${escapeHtml(e.art||'—')} · ${e.people||'?'} Personen · ${(e.dishes||[]).length} Gerichte · Summe ${fmtEUR(total)}`;
   }
   const showDishButtons = (cat==='event' || cat==='thymeandlime' || cat==='wochenmarkt' || cat==='festivalTL');
   const showInvoiceButton = (cat==='event' || cat==='thymeandlime');
@@ -2724,6 +2740,8 @@ function renderEventLikeFields(e){
     ${renderFormSection('einkauf', 'Einkaufsmenge (aus Rezepturen berechnet)', '',
       `<div id="ingredientListWrap">${renderIngredientShoppingList(e)}</div>`, false)}
 
+    ${e.category==='event' ? renderPreisFields(e) : ''}
+
     <div class="field" style="margin-top:18px;">
       <label>Nebenkostenpauschale (für Angebot/Rechnung)</label>
       <div class="pill-select" id="f-neben">
@@ -2734,6 +2752,35 @@ function renderEventLikeFields(e){
   `;
 }
 
+
+function renderPreisPreview(e){
+  if(!isStaffel(e)) return 'Preis wird wie bisher aus den Kartenpreisen der Gerichte berechnet.';
+  const o = computeOffer(e);
+  const anz = o.anzahlung ? ` · Anzahlung ${fmtEUR(o.anzahlung)}` : '';
+  return `<b>Angebot: ${fmtEUR(o.totalBrutto)}</b> brutto (Speisen ${fmtEUR(o.foodBrutto)}, Pauschale ${fmtEUR(o.nebenkosten)})${anz}`;
+}
+function renderPreisFields(e){
+  const pr = e.preis || {};
+  const on = isStaffel(e);
+  return `
+    <div class="field" style="margin-top:18px;">
+      <label>Preisberechnung</label>
+      <div class="pill-select" id="f-preis-modus">
+        <div class="pill ${on?'selected':''}" data-preis-modus="staffel">Nach Preisliste</div>
+        <div class="pill ${on?'':'selected'}" data-preis-modus="legacy">Nach Kartenpreisen (alt)</div>
+      </div>
+      ${on ? `
+      <div class="field-row" style="margin-top:10px;">
+        <div><label>Entfernung einfach (km)</label><input type="number" min="0" step="1" id="f-preis-km" value="${pr.km??''}" placeholder="z. B. 35"></div>
+        <div><label>Rabatt auf Speisen (%)</label><input type="number" min="0" max="100" step="1" id="f-preis-rabatt" value="${pr.rabatt??''}" placeholder="0"></div>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:8px;text-transform:none;letter-spacing:0;"><input type="checkbox" id="f-preis-porzellan" ${pr.porzellan?'checked':''}> Porzellan statt Einweg (+${fmtEUR(PR('porzellanAufpreis'))} p. P.)</label>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:4px;text-transform:none;letter-spacing:0;"><input type="checkbox" id="f-preis-anzahlung" ${pr.anzahlung===false?'':'checked'}> ${PR('anzahlungPct')} % Anzahlung verlangen (abwählen z. B. bei Stammkunden)</label>
+      ` : ''}
+      <div class="hint" id="preisPreview" style="margin-top:8px;">${renderPreisPreview(e)}</div>
+      <div class="hint">Preisliste: ${fmtEUR(PR('staffel1Preis'))} / ${fmtEUR(PR('staffel2Preis'))} ab ${PR('staffel2Ab')} / ${fmtEUR(PR('staffel3Preis'))} ab ${PR('staffel3Ab')} Gästen p. P. für ${PR('gerichteInklusive')} Hauptgerichte · Mindestumsatz Speisen ${fmtEUR(PR('mindestumsatz'))} · Vorspeisen/Desserts nach Karte. Werte änderst du in der <a href="kalkulation.html" style="color:var(--gold-soft);">Kalkulation</a>.</div>
+    </div>`;
+}
 
 function renderCatBlock(catKey){
   const cfg = getActiveDishConfig().db[catKey];
@@ -2890,6 +2937,7 @@ function renderEinstellungenTab(){
       <a href="kuechendisplay.html" class="btn gold sm" style="text-decoration:none;display:inline-block;">🍳 Küchenbildschirm öffnen</a>
       <a href="kundendisplay.html" class="btn gold sm" style="text-decoration:none;display:inline-block;">🔔 Kundenanzeige öffnen</a>
       <a href="loehne.html" class="btn gold sm" style="text-decoration:none;display:inline-block;">💰 Löhne öffnen</a>
+      <a href="kalkulation.html" class="btn gold sm" style="text-decoration:none;display:inline-block;">📊 Kalkulation öffnen</a>
       <a href="alice.html" class="btn gold sm" style="text-decoration:none;display:inline-block;">🤖 Alice öffnen</a>
     </div>
   </div>
@@ -2993,6 +3041,7 @@ function attachGlobalHandlers(){
   if(newEventBtn) newEventBtn.onclick = ()=>{
     state.editingEvent = { id:uid(), date:state.selectedDate, category:'event', anlass:'', contactName:'', email:'', phone:'',
       company:'', people:'', art:ART_OPTIONS[0], address:'', notes:'', dishes:[], nebenkostenOverride:null,
+      preis:{ modus:'staffel', km:'', rabatt:'', porzellan:false, anzahlung:true },
       sonstOrt:'', sonstWie:'',
       // Manuell angelegte Termine sind bereits fest vereinbart -> direkt
       // "angenommen" (grün). Nur Anfragen, die automatisch aus dem
@@ -3006,6 +3055,12 @@ function attachGlobalHandlers(){
     const evt = state.events.find(e=>e.id===b.dataset.id);
     state.editingEvent = JSON.parse(JSON.stringify(evt));
     if(!state.editingEvent.category) state.editingEvent.category = 'event';
+    // Offene Anfragen (rot, noch kein eingefrorenes Angebot) laufen ab jetzt
+    // über die Preisliste. Vereinbarte Termine bleiben unverändert.
+    const ee = state.editingEvent;
+    if(ee.category==='event' && !ee.preis && !ee.acceptedOffer && ee.requestStatus==='anfrage'){
+      ee.preis = { modus:'staffel', km:'', rabatt:'', porzellan:false, anzahlung:true };
+    }
     render();
   });
   app.querySelectorAll('[data-action="delete"]').forEach(b=>b.onclick=()=>{
@@ -3115,6 +3170,23 @@ function attachGlobalHandlers(){
     });
     const dateBisEl = document.getElementById('f-date-bis');
     if(dateBisEl) dateBisEl.oninput = ()=>{ state.editingEvent.dateBis = dateBisEl.value; };
+
+    const preisModusWrap = document.getElementById('f-preis-modus');
+    if(preisModusWrap) preisModusWrap.querySelectorAll('.pill').forEach(p=>p.onclick=()=>{
+      const ev = state.editingEvent;
+      if(p.dataset.preisModus==='staffel') ev.preis = Object.assign({km:'', rabatt:'', porzellan:false, anzahlung:true}, ev.preis||{}, {modus:'staffel'});
+      else ev.preis = Object.assign({}, ev.preis||{}, {modus:'legacy'});
+      render();
+    });
+    const refreshPreisPreview = ()=>{ const el = document.getElementById('preisPreview'); if(el) el.innerHTML = renderPreisPreview(state.editingEvent); };
+    [['f-preis-km','km'],['f-preis-rabatt','rabatt']].forEach(([id,key])=>{
+      const el = document.getElementById(id);
+      if(el) el.oninput = ()=>{ state.editingEvent.preis[key] = el.value; refreshPreisPreview(); };
+    });
+    [['f-preis-porzellan','porzellan'],['f-preis-anzahlung','anzahlung']].forEach(([id,key])=>{
+      const el = document.getElementById(id);
+      if(el) el.onchange = ()=>{ state.editingEvent.preis[key] = el.checked; refreshPreisPreview(); };
+    });
 
     const nebenWrap = document.getElementById('f-neben');
     if(nebenWrap) nebenWrap.querySelectorAll('.pill').forEach(p=>p.onclick=()=>{
@@ -4144,7 +4216,7 @@ function openMenuPrint(evt){
         <thead><tr><th>Gericht</th><th>Kategorie</th><th>Variante</th><th>Anzahl</th><th>Faktor</th><th>Preis/Einh.</th><th>Summe</th></tr></thead>
         <tbody>${rows || '<tr><td colspan="7">Keine Gerichte ausgewählt.</td></tr>'}</tbody>
       </table>
-      <div style="text-align:right;font-size:15px;font-weight:700;color:#6b1526;">Gesamtsumme (brutto): ${fmtEUR(total)}</div>
+      <div style="text-align:right;font-size:15px;font-weight:700;color:#6b1526;">${isStaffel(evt) ? 'Angebotspreis laut Preisliste (brutto, inkl. Pauschale): '+fmtEUR(computeOffer(evt).totalBrutto) : 'Gesamtsumme (brutto): '+fmtEUR(total)}</div>
       <div class="print-footnote">Red Lotus Asian Food · Warthausen bei Biberach an der Riss · redlotus-asianfood.com</div>
     </div>`;
   const pa = document.getElementById('printArea');
@@ -4162,6 +4234,92 @@ function computeNebenkosten(art,people,overrideVal){
   if(rule.type==='flat') return rule.value;
   if(rule.type==='perPerson') return rule.value*(parseFloat(people)||0);
   return 0;
+}
+/* ============================= PREISLISTE (STAFFEL) ============================= */
+// Felix, 08.11.2026: Neue Caterings werden nach Preisliste abgerechnet statt
+// über die Summe der Kartenpreise. Bereits vereinbarte Termine behalten ihre
+// alte Berechnung (Feld "preis" fehlt) — so ändert sich kein zugesagter Preis.
+// Werte kommen aus settings/kalkulation (gepflegt in kalkulation.html),
+// sonst gelten diese Startwerte.
+const PREIS_DEFAULTS = {
+  staffel1Preis:20, staffel2Ab:150, staffel2Preis:19, staffel3Ab:250, staffel3Preis:18,
+  gerichteInklusive:2, aufpreisGericht:2.5, premiumAufpreis:3, porzellanAufpreis:2.5,
+  mindestumsatz:1500, anfahrtFreiKm:50, anfahrtProKm:1.5, anzahlungPct:25,
+  bedingungen: [
+    'Leistung: Foodtruck-Catering mit {inkl} Hauptgerichten inkl. Reis, 3 Stunden Essensausgabe, Speisen so viel jeder möchte (kalkuliert mit 1,5 Portionen pro Gast). Plastikfreies Einweggeschirr und Besteck inklusive.',
+    'Anzahlung: {anzahlung} % des Gesamtbetrags bei Auftragsbestätigung; die Anzahlung wird mit der Schlussrechnung verrechnet.',
+    'Gästezahl: Bis 1 Monat vor der Veranstaltung kann die Gästezahl kostenfrei um bis zu 25 % reduziert werden, bis 2 Wochen vorher um bis zu 10 %. Danach ist keine Reduzierung mehr möglich, da der Einkauf bereits erfolgt ist.',
+    'Stornierung: Bis 2 Monate vor der Veranstaltung kostenfrei. Danach berechnen wir vom Auftragswert: weniger als 2 Monate vorher 15 %, weniger als 1 Monat vorher 25 %, weniger als 2 Wochen vorher 50 %, in der Woche der Veranstaltung 100 %. Ausgenommen sind Todesfall, schwere Erkrankung oder Geburt im engsten Kreis.'
+  ].join('\n')
+};
+const PREMIUM_VARIANTS = ['Rind','Fisch','Seafood'];
+function PR(k){
+  const r = state.preisRegeln || {};
+  const v = r[k];
+  if(v===undefined || v===null || v==='') return PREIS_DEFAULTS[k];
+  if(typeof PREIS_DEFAULTS[k]==='number'){ const n = parseFloat(v); return isNaN(n) ? PREIS_DEFAULTS[k] : n; }
+  return v;
+}
+function staffelPreis(people){
+  const g = parseFloat(people)||0;
+  if(g >= PR('staffel3Ab')) return PR('staffel3Preis');
+  if(g >= PR('staffel2Ab')) return PR('staffel2Preis');
+  return PR('staffel1Preis');
+}
+function isMainDish(d){ return d && d.category!=='vorspeisen' && d.category!=='desserts'; }
+function isStaffel(evt){ return !!(evt && evt.preis && evt.preis.modus==='staffel'); }
+function round2(x){ return Math.round(x*100)/100; }
+// Liefert alle Positionen für Angebot/Rechnung. Alle Positionen 7 % MwSt
+// (Speisen + unselbständige Nebenleistungen zur Catering-Leistung).
+function computeOffer(src){
+  const people = parseFloat(src.people)||0;
+  const nebenkosten = computeNebenkosten(src.art, src.people, src.nebenkostenOverride);
+  if(!isStaffel(src)){
+    const dishTotal = eventDishTotal(src);
+    return { mode:'legacy', foodBrutto:dishTotal, nebenkosten, totalBrutto: dishTotal + nebenkosten, lines:[], anzahlung:0 };
+  }
+  const pr = src.preis || {};
+  const dishes = src.dishes || [];
+  const mains = dishes.filter(isMainDish);
+  const extras = dishes.filter(d=>!isMainDish(d));
+  const lines = [];
+  const artLabel = ART_INVOICE_LABEL[src.art] || (src.art||'Catering');
+  const inkl = PR('gerichteInklusive');
+  lines.push({ label:`${artLabel} (${inkl} Hauptgerichte inkl. Reis, 3 Std. Ausgabe)`, qty:people, unit:staffelPreis(people) });
+  const extraMains = Math.max(0, mains.length - inkl);
+  if(extraMains>0) lines.push({ label:`Aufpreis ${extraMains} weitere${extraMains>1?'':'s'} Hauptgericht${extraMains>1?'e':''}`, qty:people, unit: round2(extraMains*PR('aufpreisGericht')) });
+  const premium = mains.filter(d=>PREMIUM_VARIANTS.includes(d.variant)).length;
+  if(premium>0) lines.push({ label:`Aufpreis Rind/Fisch/Seafood (${premium} Gericht${premium>1?'e':''})`, qty:people, unit: round2(premium*PR('premiumAufpreis')) });
+  extras.forEach(d=>{
+    const q = (parseFloat(d.qty)||0) * (parseFloat(d.factor)||1);
+    if(q>0) lines.push({ label: d.name + (d.variant?' ('+d.variant+')':''), qty:q, unit: parseFloat(d.unitPrice)||0 });
+  });
+  const speisen = lines.reduce((t,l)=>t+l.qty*l.unit, 0);
+  let nachRabatt = speisen;
+  const rabattPct = parseFloat(pr.rabatt)||0;
+  if(rabattPct>0){
+    const r = round2(speisen*rabattPct/100);
+    lines.push({ label:`Rabatt ${String(rabattPct).replace('.',',')} % auf Speisen`, qty:1, unit:-r });
+    nachRabatt -= r;
+  }
+  if(people>0 && nachRabatt < PR('mindestumsatz')){
+    lines.push({ label:`Mindestumsatz-Ausgleich (Mindestumsatz Speisen ${fmtEUR(PR('mindestumsatz'))})`, qty:1, unit: round2(PR('mindestumsatz')-nachRabatt) });
+  }
+  const foodBrutto = lines.reduce((t,l)=>t+l.qty*l.unit, 0);
+  if(pr.porzellan) lines.push({ label:'Porzellangeschirr statt Einweg', qty:people, unit:PR('porzellanAufpreis') });
+  const km = parseFloat(pr.km)||0;
+  const mehrKm = Math.max(0, km - PR('anfahrtFreiKm'));
+  if(mehrKm>0) lines.push({ label:`Anfahrtszuschlag (${mehrKm} km über ${PR('anfahrtFreiKm')} km, Hin- und Rückweg)`, qty: mehrKm*2, unit:PR('anfahrtProKm') });
+  lines.push({ label:'Catering-Nebenkosten-Pauschale', qty:1, unit:nebenkosten });
+  const totalBrutto = round2(lines.reduce((t,l)=>t+l.qty*l.unit, 0));
+  const anzahlung = (pr.anzahlung===false) ? 0 : round2(totalBrutto*PR('anzahlungPct')/100);
+  return { mode:'staffel', lines, foodBrutto, nebenkosten, totalBrutto, anzahlung };
+}
+function bedingungenText(src){
+  const pr = (src && src.preis) || {};
+  return String(PR('bedingungen')||'').split('\n').map(t=>t.trim()).filter(Boolean)
+    .filter(t => !(pr.anzahlung===false && /^Anzahlung/i.test(t)))
+    .map(t => t.replace(/\{inkl\}/g, PR('gerichteInklusive')).replace(/\{anzahlung\}/g, PR('anzahlungPct')));
 }
 const ART_INVOICE_LABEL = {
   'Foodtruckcatering': 'Foodtruck-Catering',
@@ -4214,8 +4372,10 @@ function openOfferPrint(evt, opts){
     people: evt.acceptedOffer.people,
     art: evt.acceptedOffer.art,
     nebenkostenOverride: evt.acceptedOffer.nebenkostenOverride,
-    category: evt.acceptedOffer.category
+    category: evt.acceptedOffer.category,
+    preis: evt.acceptedOffer.preis || null
   } : evt;
+  if(isStaffel(src)) return openOfferPrintStaffel(evt, src, opts);
   const dishTotalBrutto = eventDishTotal(src);
   const nebenkosten = computeNebenkosten(src.art, src.people, src.nebenkostenOverride);
   const people = parseFloat(src.people)||1;
@@ -4367,6 +4527,132 @@ function openOfferPrint(evt, opts){
     const el = document.getElementById(id);
     if(el) el.addEventListener('input', recalcInvoice);
   });
+
+  const sendBtn = document.getElementById('sendInvoiceEmailBtn');
+  if(sendBtn) sendBtn.onclick = ()=>sendInvoiceEmail(evt, sendBtn);
+}
+
+/* ============================= ANGEBOT/RECHNUNG NACH PREISLISTE ============================= */
+// Gleicher Kopf/Fuß wie openOfferPrint, aber beliebig viele Positionen
+// (Staffelpreis, Aufpreise, Vorspeisen/Desserts, Rabatt, Mindestumsatz,
+// Porzellan, Anfahrt, Pauschale). Alle Positionen 7 % MwSt. Preise und
+// Mengen bleiben direkt im Dokument änderbar, Summen rechnen live nach.
+function openOfferPrintStaffel(evt, src, opts){
+  opts = opts || {};
+  const offer = computeOffer(src);
+  const groups = dishesByInvoiceGroup(src);
+  const groupNames = Object.keys(groups);
+  const maxRows = Math.max(...groupNames.map(g=>groups[g].length), 1);
+  let dishRows = '';
+  for(let i=0;i<maxRows;i++){
+    dishRows += '<tr>' + groupNames.map(g=>`<td>${escapeHtml(groups[g][i]||'-')}</td>`).join('') + '</tr>';
+  }
+  const logo = `<img src="${state.settings.logo || DEFAULT_LOGO}">`;
+  const invNoPrefill = opts.fromAccepted && opts.invoiceNo ? opts.invoiceNo : '00001';
+  const startType = opts.fromAccepted ? 'Rechnung' : 'Angebot';
+  const fmtQty = q => (Math.round(q*100)/100).toLocaleString('de-DE');
+  const rowsHtml = offer.lines.map((l,i)=>`
+          <tr class="inv-line">
+            <td>${i+1}</td>
+            <td contenteditable="true">${escapeHtml(l.label)}</td>
+            <td style="text-align:right;" class="l-netto">${fmtEUR(l.unit/1.07)}</td>
+            <td style="text-align:center;" class="l-qty" contenteditable="true">${fmtQty(l.qty)}</td>
+            <td style="text-align:right;" class="l-brutto" contenteditable="true">${fmtEUR(l.unit)}</td>
+            <td style="text-align:center;">7 %</td>
+          </tr>`).join('');
+  const nettoGesamt = offer.totalBrutto/1.07;
+  const terms = bedingungenText(src);
+
+  const html = `
+    <div class="print-toolbar">
+      <div class="doc-type-toggle" style="display:flex;gap:6px;margin-right:auto;">
+        ${opts.fromAccepted ? '' : `<button type="button" class="btn ghost sm doc-type-btn ${startType==='Angebot'?'active':''}" data-doctype="Angebot">Angebot</button>`}
+        <button type="button" class="btn ghost sm doc-type-btn ${startType==='Rechnung'?'active':''}" data-doctype="Rechnung">Rechnung</button>
+      </div>
+      ${(opts.fromAccepted && evt.email) ? `<button type="button" class="btn gold" id="sendInvoiceEmailBtn">📧 Rechnung an Kunde senden</button>` : ''}
+      <button type="button" class="btn gold" onclick="window.print()">Drucken / Als PDF speichern</button>
+      <button type="button" class="btn ghost" onclick="document.getElementById('printArea').classList.remove('show')">Schließen</button>
+    </div>
+    <div class="print-body invoice-body">
+      <div class="inv-topline" contenteditable="true">${COMPANY.name} – ${COMPANY.addressLine} – ${COMPANY.cityLine}</div>
+      <div class="inv-header-grid">
+        <div class="inv-recipient">
+          ${evt.company ? `<div contenteditable="true"><b>${escapeHtml(evt.company)}</b></div>` : ''}
+          <div contenteditable="true">${escapeHtml(evt.contactName||'Name Ansprechpartner')}</div>
+          <div contenteditable="true">${escapeHtml(evt.address||'Straße, PLZ Ort')}</div>
+        </div>
+        <div class="inv-sender">
+          <div class="rl-print-logo">${logo}</div>
+          <div contenteditable="true"><b>${COMPANY.name}</b><br>${COMPANY.addressLine}<br>${COMPANY.cityLine}<br>Tel.: ${COMPANY.tel}<br>Mobil: ${COMPANY.mobil}<br>E-Mail: ${COMPANY.email}</div>
+        </div>
+      </div>
+      <h1 class="inv-title" id="invTitle" contenteditable="true">${startType} Catering</h1>
+      <div class="inv-meta">
+        <span><b id="invNoLabel">${startType}:</b> <span contenteditable="true" id="invNo">${escapeHtml(invNoPrefill)}</span></span>
+        <span><b>Datum:</b> <span contenteditable="true">${new Date().toLocaleDateString('de-DE')}</span></span>
+        <span><b>Leistungsdatum:</b> <span contenteditable="true">${new Date(evt.date).toLocaleDateString('de-DE')}</span></span>
+      </div>
+      <table class="inv-table">
+        <thead><tr><th>#</th><th>Beschreibung</th><th>Einzelpreis Netto</th><th>Anzahl</th><th>Einzelpreis Brutto</th><th>MwSt.-Satz</th></tr></thead>
+        <tbody id="invLines">${rowsHtml}</tbody>
+      </table>
+      <table class="inv-summary">
+        <tbody>
+          <tr class="inv-total-row"><td><b>Nettopreis gesamt</b></td><td style="text-align:right;" id="sumNetto"><b>${fmtEUR(nettoGesamt)}</b></td></tr>
+          <tr><td>MwSt. 7 %</td><td style="text-align:right;" id="sumMwst">${fmtEUR(offer.totalBrutto-nettoGesamt)}</td></tr>
+          <tr class="inv-total-row"><td><b>Gesamtbetrag</b></td><td style="text-align:right;" id="sumBrutto"><b>${fmtEUR(offer.totalBrutto)}</b></td></tr>
+          ${offer.anzahlung ? `<tr class="inv-anzahlung only-angebot"><td>Anzahlung ${PR('anzahlungPct')} % bei Auftragsbestätigung</td><td style="text-align:right;" id="sumAnzahlung">${fmtEUR(offer.anzahlung)}</td></tr>` : ''}
+        </tbody>
+      </table>
+      <table class="inv-dishes">
+        <thead><tr>${groupNames.map(g=>`<th>${escapeHtml(g)}</th>`).join('')}</tr></thead>
+        <tbody>${dishRows}</tbody>
+      </table>
+      ${terms.length ? `<div class="inv-terms only-angebot" contenteditable="true">${terms.map(t=>{
+        const i = t.indexOf(':');
+        return i>0 && i<20 ? `<p><b>${escapeHtml(t.slice(0,i+1))}</b>${escapeHtml(t.slice(i+1))}</p>` : `<p>${escapeHtml(t)}</p>`;
+      }).join('')}</div>` : ''}
+      <div class="inv-footer" contenteditable="true">
+        <div><b>Rechtsform:</b> ${COMPANY.rechtsform}<br><b>Geschäftsführer:</b> ${COMPANY.geschaeftsfuehrer}<br><b>Kontoinhaber:</b> ${COMPANY.kontoinhaber}</div>
+        <div><b>Steuernummer:</b> ${COMPANY.steuernummer}</div>
+        <div>${COMPANY.bank}</div>
+      </div>
+    </div>`;
+  const pa = document.getElementById('printArea');
+  pa.innerHTML = html;
+  pa.classList.add('show');
+
+  const applyDocType = (type)=>{
+    document.getElementById('invTitle').textContent = type+' Catering';
+    document.getElementById('invNoLabel').textContent = type+':';
+    pa.querySelectorAll('.only-angebot').forEach(el=>{ el.style.display = (type==='Angebot') ? '' : 'none'; });
+  };
+  applyDocType(startType);
+  pa.querySelectorAll('.doc-type-btn').forEach(btn=>btn.onclick=()=>{
+    pa.querySelectorAll('.doc-type-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    applyDocType(btn.dataset.doctype);
+  });
+
+  function parseGermanNumber(str){
+    return parseFloat(String(str).replace(/[^\d,.-]/g,'').replace(/\./g,'').replace(',','.'))||0;
+  }
+  function recalc(){
+    let brutto = 0;
+    pa.querySelectorAll('tr.inv-line').forEach(tr=>{
+      const unit = parseGermanNumber(tr.querySelector('.l-brutto').textContent);
+      const qty = parseGermanNumber(tr.querySelector('.l-qty').textContent);
+      tr.querySelector('.l-netto').textContent = fmtEUR(unit/1.07);
+      brutto += unit*qty;
+    });
+    const netto = brutto/1.07;
+    document.getElementById('sumNetto').innerHTML = '<b>'+fmtEUR(netto)+'</b>';
+    document.getElementById('sumMwst').textContent = fmtEUR(brutto-netto);
+    document.getElementById('sumBrutto').innerHTML = '<b>'+fmtEUR(brutto)+'</b>';
+    const anz = document.getElementById('sumAnzahlung');
+    if(anz) anz.textContent = fmtEUR(brutto*PR('anzahlungPct')/100);
+  }
+  pa.querySelectorAll('.l-brutto, .l-qty').forEach(el=>el.addEventListener('input', recalc));
 
   const sendBtn = document.getElementById('sendInvoiceEmailBtn');
   if(sendBtn) sendBtn.onclick = ()=>sendInvoiceEmail(evt, sendBtn);
